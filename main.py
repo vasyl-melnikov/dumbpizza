@@ -1,13 +1,20 @@
+from enum import Enum
+
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
-from kivy.uix.image import AsyncImage
+from kivy.uix.filechooser import FileChooserIconView
+from kivy.uix.image import AsyncImage, Image
+from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.textinput import TextInput
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDIconButton
 from kivymd.uix.card import MDCard
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.dropdownitem import MDDropDownItem
 from kivymd.uix.label import MDLabel
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.textfield import MDTextField
@@ -15,65 +22,60 @@ from kivy.uix.scrollview import ScrollView
 from kivymd.uix.list import OneLineListItem, MDList
 from sqlmodel import SQLModel, create_engine, Session, Field, Relationship
 import base64
-
-
-class OrderMenuItems(SQLModel, table=True):
-    order_id: int | None = Field(default=None, foreign_key="order.id",
-                                 primary_key=True)
-    menu_item_id: int | None = Field(default=None, foreign_key="menuitem.id",
-                                     primary_key=True)
-
-
-class MenuItem(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    name: str
-    price: float
-    description: str
-    image: str
-    orders: list["Order"] = Relationship(back_populates="menu_items",
-                                         link_model=OrderMenuItems)
-
-
-class Order(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    total_price: float
-    menu_items: list[MenuItem] = Relationship(back_populates="orders",
-                                              link_model=OrderMenuItems)
-
+from models import OrderStatus, User, Admin, OrderMenuItems, MenuItem, Order
+from managers import AdminManager, UserManager
 
 # SQLite database URL
 DATABASE_URL = "sqlite:///./pizzeria.db"
 
 # Set up SQLite database
 engine = create_engine(DATABASE_URL, echo=True)
+user_manager = UserManager(engine)
+admin_manager = AdminManager(engine)
 
 
 def gen_metadata():
     SQLModel.metadata.create_all(engine)
     MENU_ITEMS = [
-        {"name": "Margherita Pizza", "price": 8.99,
+        {"name": "Margherita Pizza",
+         "price": 8.99,
          "description": "Classic pizza topped with tomato sauce, mozzarella cheese, and fresh basil leaves.",
-         "image": "pizza_img.jpg"},
-        {"name": "Pepperoni Pizza", "price": 9.99,
+         "image": "pizza_img.jpg",
+         "weight": 245,
+         "radius": 30
+         },
+        {"name": "Pepperoni Pizza",
+         "price": 9.99,
          "description": "Delicious pizza topped with spicy pepperoni slices and mozzarella cheese on a tomato sauce base.",
-         "image": "pizza_img.jpg"},
-        {"name": "Vegetarian Pizza", "price": 10.99,
+         "image": "pizza_img.jpg",
+         "weight": 245,
+         "radius": 30
+         },
+        {"name": "Vegetarian Pizza",
+         "price": 10.99,
          "description": "Healthy pizza loaded with assorted vegetables such as bell peppers, onions, mushrooms, and olives.",
-         "image": "pizza_img.jpg"},
-        {"name": "Supreme Pizza", "price": 11.99,
+         "image": "pizza_img.jpg",
+         "weight": 245,
+         "radius": 30
+         },
+        {"name": "Supreme Pizza",
+         "price": 11.99,
          "description": "A flavorful pizza topped with a variety of ingredients including pepperoni, sausage, bell peppers, onions, and mushrooms.",
-         "image": "pizza_img.jpg"}
+         "image": "pizza_img.jpg",
+         "weight": 245,
+         "radius": 30
+         }
     ]
-    with Session(engine) as session:
-        for item in MENU_ITEMS:
-            with open(item['image'], 'rb') as f:
-                img_data = f.read()
-            menu = MenuItem(name=item['name'],
-                            description=item['description'],
-                            price=item['price'],
-                            image=base64.b64encode(img_data).decode('utf-8'))
-            session.add(menu)
-        session.commit()
+    for item in MENU_ITEMS:
+        with open(item['image'], 'rb') as f:
+            img_data = f.read()
+        menu = MenuItem(name=item['name'],
+                        description=item['description'],
+                        price=item['price'],
+                        image=base64.b64encode(img_data).decode('utf-8'),
+                        weight=item['weight'],
+                        radius=item['radius'])
+        admin_manager.insert_menu_item(menu)
 
 
 class AdminPage:
@@ -82,49 +84,37 @@ class AdminPage:
         self.screen_manager = screen_manager
         self.login_page_entrance = login_page_entrance
 
-    def get_menu_items(self) -> list[MenuItem]:
-        with Session(engine) as session:
-            return session.query(MenuItem).all()
-
     def show_admin_order_screen(self):
         orders_screen = Screen(name='orders')
-
-        # Create a layout for orders
-        orders_layout = BoxLayout(orientation='vertical', padding=dp(24),
-                                  spacing=dp(16))
 
         # Create a scrollable view for orders list
         orders_scroll_view = ScrollView()
         orders_list = MDList(padding=dp(24), spacing=dp(16))
-        with Session(engine) as session:
-            for order in session.query(Order).all():
-                card = MDCard(size_hint=(None, None), size=(400, 200),
-                              padding=dp(16), spacing=dp(8))
-                card.add_widget(MDLabel(text=f"Order ID: {order.id}",
-                                        font_style='Subtitle1'))
-                menu_items_text = ""
-                for menu_item in order.menu_items:
-                    menu_items_text += f"{menu_item.name} - ${menu_item.price}\n"
-                card.add_widget(
-                    MDLabel(text=menu_items_text, font_style='Body1',
-                            size_hint_y=None, height=dp(100)))
+        for order in admin_manager.get_all_orders():
+            card = MDCard(size_hint=(None, None), size=(800, 200),
+                          padding=dp(16), spacing=dp(8))
+            card.add_widget(MDLabel(text=f"Order ID: {order.id}",
+                                    font_style='Subtitle1'))
+            menu_items_text = ""
+            for menu_item in order.menu_items:
+                menu_items_text += f"{menu_item.name} - ${menu_item.price}\n"
+            card.add_widget(
+                MDLabel(text=menu_items_text, font_style='Body1', height=dp(100)))
 
-                # Add buttons for controlling order status
-                status_button = MDIconButton(
-                    icon="checkbox-blank-circle-outline",
-                    pos_hint={'center_x': 0.5})
-                status_button.bind(on_release=self.show_status_menu)
-                card.add_widget(status_button)
-                orders_list.add_widget(card)
+            # Add buttons for controlling order status
+            status_button = MDIconButton(
+                icon="checkbox-blank-circle-outline",
+                pos_hint={'center_x': 0.5})
+            status_button.order_id = order.id
+            status_button.bind(on_release=self.show_status_menu)
+            card.add_widget(status_button)
+            orders_list.add_widget(card)
 
         orders_scroll_view.add_widget(orders_list)
 
-        # Add the scrollable view to the layout
-        orders_layout.add_widget(orders_scroll_view)
-
         # Create buttons section as a footer
         buttons_layout = BoxLayout(orientation='horizontal', padding=dp(12),
-                                   spacing=dp(12))
+                                   spacing=dp(12), height=dp(120))
         add_item_button = MDRaisedButton(text="Add Item", size_hint_x=None,
                                          width=dp(120),
                                          on_release=self.add_item)
@@ -138,39 +128,64 @@ class AdminPage:
         buttons_layout.add_widget(add_item_button)
         buttons_layout.add_widget(back_button)
 
-        # Add the buttons layout to the main orders layout
-        orders_layout.add_widget(buttons_layout)
-
-        orders_screen.add_widget(orders_layout)
+        orders_screen.add_widget(orders_scroll_view)
+        orders_screen.add_widget(buttons_layout)
 
         self.screen_manager.add_widget(orders_screen)
 
     def show_status_menu(self, button):
         menu = MDDropdownMenu(
             caller=button,
-            items=[{"text": "In Progress"}, {"text": "Cancelled"},
-                   {"text": "Done"}],
-            position="bottom",
+            items=[{"viewclass": "OneLineListItem",
+                    "text": OrderStatus.CREATED.value.title(),
+                    "on_release": lambda: self.on_status_change(button.order_id,
+                                                                OrderStatus.CREATED.value)},
+                   {"viewclass": "OneLineListItem",
+                    "text": OrderStatus.COOKING.value.title(),
+                    "on_release": lambda: self.on_status_change(button.order_id,
+                                                                OrderStatus.COOKING.value)},
+                   {"viewclass": "OneLineListItem",
+                    "text": OrderStatus.CANCELLED.value.title(),
+                    "on_release": lambda: self.on_status_change(button.order_id,
+                                                                OrderStatus.CANCELLED.value)},
+                   {"viewclass": "OneLineListItem",
+                    "text": OrderStatus.READY.value.title(),
+                    "on_release": lambda: self.on_status_change(button.order_id,
+                                                                OrderStatus.READY.value)},
+                   {"viewclass": "OneLineListItem",
+                    "text": OrderStatus.DONE.value.title(),
+                    "on_release": lambda: self.on_status_change(button.order_id,
+                                                                OrderStatus.DONE.value)}
+                   ],
             width_mult=4
         )
+        # menu.bind(on_release=self.on_status_change)  # Bind on_release event
         menu.open()
 
-    def on_status_change(self, text):
-        print(1)
+    def on_status_change(self, order_id: int, status: str):
+        print(order_id, status)
 
     def show_admin_menu_screen(self):
-        menu_screen = Screen(name='menu')
         menu_list = MDList(padding=dp(24), spacing=dp(16))
-        for item in self.get_menu_items():
+        for item in user_manager.get_menu_items():
             card = MDCard(size_hint_y=None, height=dp(200), padding=dp(16),
                           spacing=dp(8))
             card.md_bg_color = "#808080"
-            card.add_widget(MDLabel(text=item.name, halign='center', font_style='H6'))
+            card.add_widget(
+                MDLabel(text=item.name, halign='center', font_style='H6'))
             card.add_widget(MDLabel(text=f"${item.price}", halign='center'))
             card.add_widget(MDLabel(text=item.description, halign='left'))
-            with open('tmp.img', 'wb') as f:
+            with open(f'assets/menu_item{item.id}.jpg', 'wb') as f:
                 f.write(base64.b64decode(item.image))
-            card.add_widget(AsyncImage(source='tmp.img'))
+            card.add_widget(AsyncImage(source=f'assets/menu_item{item.id}.jpg'))
+
+            # Add an "Edit" button to each menu item card
+            edit_button = MDRaisedButton(text="Edit", size_hint=(None, None),
+                                         size=(100, 50))
+            edit_button.bind(
+                on_release=lambda button, item=item: self.show_edit_popup(item))
+            card.add_widget(edit_button)
+
             menu_list.add_widget(card)
         menu_scroll_view = ScrollView()
         menu_scroll_view.add_widget(menu_list)
@@ -197,6 +212,87 @@ class AdminPage:
         admin_screen.add_widget(buttons_layout)
 
         self.screen_manager.add_widget(admin_screen)
+
+    def show_edit_popup(self, item):
+        # Create a popup window for editing menu item properties
+        self.cur_menu_item_edit = item
+        popup_content = BoxLayout(orientation='vertical', padding=dp(24),
+                                  spacing=dp(16))
+
+        # Add text input fields for editing menu item properties
+        name_input = TextInput(text=item.name, hint_text="Name")
+        price_input = TextInput(text=str(item.price), hint_text="Price")
+        weight_input = TextInput(text=str(item.weight), hint_text="Weight")
+        radius_input = TextInput(text=str(item.radius), hint_text="Radius")
+        description_input = TextInput(text=item.description,
+                                      hint_text="Description")
+
+        popup_content.add_widget(name_input)
+        popup_content.add_widget(price_input)
+        popup_content.add_widget(weight_input)
+        popup_content.add_widget(radius_input)
+        popup_content.add_widget(description_input)
+
+        # Add a button to select a new image
+        choose_image_button = Button(text="Choose Image")
+        choose_image_button.bind(
+            on_release=lambda button: self.choose_image(popup_content))
+        popup_content.add_widget(choose_image_button)
+
+        # Add a button to save changes
+        save_button = MDRaisedButton(text="Save Changes",
+                                     size_hint=(None, None), size=(150, 50))
+        save_button.bind(
+            on_release=lambda button: self.save_menu_item_changes(item,
+                                                                  name_input.text,
+                                                                  float(price_input.text),
+                                                                  description_input.text,
+                                                                  float(weight_input.text),
+                                                                  float(radius_input.text)))
+        popup_content.add_widget(save_button)
+
+        # Create and open the popup
+        popup = Popup(title="Edit Menu Item", content=popup_content,
+                      size_hint=(None, None), size=(800, 900))
+        popup.open()
+
+    def choose_image(self, popup_content):
+        # Create a file chooser to select an image
+        file_chooser = FileChooserIconView()
+        file_chooser.path = '.'  # Set initial path
+        file_chooser.bind(
+            on_submit=lambda chooser, path, _: self.on_image_selected(path,
+                                                                   popup_content))
+
+        # Clear existing widgets and add the file chooser
+        popup_content.clear_widgets()
+        popup_content.add_widget(file_chooser)
+
+    def on_image_selected(self, path, popup_content):
+        # Show the selected image in the popup and provide an option to upload it
+        image_preview = Image(source=path[0])
+        upload_button = Button(text="Upload Image")
+        upload_button.bind(on_release=lambda button: self.upload_image(path))
+
+        # Clear existing widgets and add the image preview and upload button
+        popup_content.clear_widgets()
+        popup_content.add_widget(image_preview)
+        popup_content.add_widget(upload_button)
+
+    def upload_image(self, path):
+        with open(path[0], 'rb') as f:
+            img_data = f.read()
+        self.cur_menu_item_edit.image = base64.b64encode(img_data).decode('utf-8')
+        admin_manager.insert_menu_item(self.cur_menu_item_edit)
+        self.cur_menu_item_edit = None
+
+    def save_menu_item_changes(self, item, name, price, description, weight, radius):
+        item.name = name
+        item.price = price
+        item.description = description
+        item.weight = weight
+        item.radius = radius
+        admin_manager.insert_menu_item(item)
 
     def dismiss_dialog(self, instance):
         if self.dialog is not None:
@@ -287,21 +383,9 @@ class GuestPage:
         self.selected_items = []
         self.total_price = 0
 
-    def get_menu_items(self) -> list[MenuItem]:
-        with Session(engine) as session:
-            return session.query(MenuItem).all()
-
-    def get_menu_item(self, id) -> MenuItem:
-        with Session(engine) as session:
-            return session.query(MenuItem).where(MenuItem.id == id).one()
-
-    def get_orders(self) -> list[Order]:
-        with Session(engine) as session:
-            return session.query(Order).all()
-
     def add_order(self, menu_items: list[int]):
-        items = [self.get_menu_item(m_id) for m_id in menu_items]
-        order = Order(total_price=self.total_price, menu_items=items)
+        items = [user_manager.get_menu_item_by_id(m_id) for m_id in menu_items]
+        order = Order(total_price=self.total_price, menu_items=items, status=OrderStatus.CREATED)
         with Session(engine) as session:
             session.add(order)
             session.commit()
@@ -317,7 +401,7 @@ class GuestPage:
         self.selected_items = []
         self.total_price = 0
 
-        for item in self.get_menu_items():
+        for item in user_manager.get_menu_items():
             checkbox = CheckBox(size_hint=(None, None), size=(dp(48), dp(48)))
             checkbox.item_name = item.name
             checkbox.id = item.id
