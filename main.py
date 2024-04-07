@@ -167,6 +167,7 @@ class AdminPage:
 
     def show_admin_menu_screen(self):
         menu_list = MDList(padding=dp(24), spacing=dp(16))
+        cards = []
         for item in user_manager.get_menu_items():
             card = MDCard(size_hint_y=None, height=dp(200), padding=dp(16),
                           spacing=dp(8))
@@ -177,7 +178,8 @@ class AdminPage:
             card.add_widget(MDLabel(text=item.description, halign='left'))
             with open(f'assets/menu_item{item.id}.jpg', 'wb') as f:
                 f.write(base64.b64decode(item.image))
-            card.add_widget(AsyncImage(source=f'assets/menu_item{item.id}.jpg'))
+            card.add_widget(AsyncImage(source=f'assets/menu_item{item.id}.jpg',
+                                       nocache=True))
 
             # Add an "Edit" button to each menu item card
             edit_button = MDRaisedButton(text="Edit", size_hint=(None, None),
@@ -185,8 +187,11 @@ class AdminPage:
             edit_button.bind(
                 on_release=lambda button, item=item: self.show_edit_popup(item))
             card.add_widget(edit_button)
+            cards.append(card)
 
+        for card in cards:
             menu_list.add_widget(card)
+
         menu_scroll_view = ScrollView()
         menu_scroll_view.add_widget(menu_list)
 
