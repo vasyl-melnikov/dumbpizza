@@ -1,3 +1,5 @@
 venv
 .idea
 tmp.img
+pizzeria.db
+assets
