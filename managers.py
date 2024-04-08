@@ -88,7 +88,7 @@ class UserManager:
                 session.delete(user)
                 session.commit()
 
-    def update_user(self, old_phone_number: int, user: User) -> User | None:
+    def update_user(self, old_phone_number: str, user: User) -> User | None:
         with Session(self.__db) as session:
             statement = select(User).where(User.phone_number == old_phone_number)
             old_user = session.exec(statement).one()

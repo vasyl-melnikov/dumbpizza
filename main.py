@@ -679,8 +679,8 @@ class GuestPage:
             dialog.open()
             self.dialog = dialog
         else:
-            old_phone_number: int = int(get_logged_in_user().get("phone_number"))
-            user = User(first_name=first_name, last_name=last_name, phone_number=int(phone_num))
+            old_phone_number = get_logged_in_user().get("phone_number")
+            user = User(first_name=first_name, last_name=last_name, phone_number=phone_num)
             new_user = user_manager.update_user(old_phone_number, user)
 
             if not new_user:
@@ -697,7 +697,7 @@ class GuestPage:
                     file.write(f"{new_user.id},{first_name},{last_name},{phone_num}")
 
             self.screen_manager.clear_widgets()
-            self.show_guest_screen()
+            self.edit_credentials_page()
 
     def on_checkbox_active(self, checkbox, value):
         if value:
