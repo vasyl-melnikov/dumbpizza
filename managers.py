@@ -22,7 +22,7 @@ class AdminManager:
 
     def get_all_orders(self) -> list[Order]:
         with Session(self.__db) as session:
-            return session.exec(select(Order).options(selectinload(Order.menu_items))).all()
+            return session.exec(select(Order).options(selectinload(Order.menu_items), selectinload(Order.user))).all()
 
     def get_order_by_id(self, order_id: int) -> Order:
         with Session(self.__db) as session:

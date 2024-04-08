@@ -80,27 +80,32 @@ def gen_metadata():
 
 
 class AdminPage:
-    def __init__(self, screen_manager, login_page_entrance):
+    def __init__(self, screen_manager, login_page_entrance, get_login_user_data):
         self.dialog = None
         self.screen_manager = screen_manager
         self.login_page_entrance = login_page_entrance
+        self.get_login_user_data = get_login_user_data
 
     def show_admin_order_screen(self):
         orders_screen = Screen(name='orders')
 
         # Create a scrollable view for orders list
         orders_scroll_view = ScrollView()
-        orders_list = MDList(padding=dp(24), spacing=dp(16))
+        orders_list = MDList(padding=dp(24), spacing=dp(24))
         for order in admin_manager.get_all_orders():
-            card = MDCard(size_hint=(None, None), size=(1000, 200),
+            card = MDCard(size_hint=(None, None), size=(1500, 350),
                           padding=dp(16), spacing=dp(8))
             card.add_widget(MDLabel(text=f"Order ID: {order.id}",
                                     font_style='Subtitle1'))
-            card.add_widget(MDLabel(text=f"Created at: {order.created_at}",
+            card.add_widget(MDLabel(text=f"Created at: {order.created_at.strftime('%m/%d/%Y, %H:%M:%S')}",
                                     font_style='Subtitle1'))
             card.add_widget(MDLabel(text=f"Status: {order.status}",
                                     font_style='Subtitle1'))
-            card.add_widget(MDLabel(text=f"{order.user.dict()}",
+            card.add_widget(MDLabel(text=f"Guest name: {order.user.first_name}",
+                                    font_style='Subtitle1'))
+            card.add_widget(MDLabel(text=f"Guest last name: {order.user.last_name}",
+                                    font_style='Subtitle1'))
+            card.add_widget(MDLabel(text=f"Guest phone number: {order.user.phone_number}",
                                     font_style='Subtitle1'))
 
             menu_items_text = ""
@@ -111,9 +116,7 @@ class AdminPage:
                         height=dp(100)))
 
             # Add buttons for controlling order status
-            status_button = MDIconButton(
-                icon="checkbox-blank-circle-outline",
-                pos_hint={'center_x': 0.5})
+            status_button = MDRaisedButton(text='Change status')
             status_button.order_id = order.id
             status_button.bind(on_release=self.show_status_menu)
             card.add_widget(status_button)
@@ -529,10 +532,11 @@ class LoginPage:
 
 class GuestPage:
     def __init__(self, screen_manager, show_admin_login_screen,
-                 admin_login_page_entrance):
+                 admin_login_page_entrance, get_login_user_data):
         self.screen_manager = screen_manager
         self.show_admin_login_screen = show_admin_login_screen
         self.admin_login_page_entrance = admin_login_page_entrance
+        self.get_login_user_data = get_login_user_data
         self.dialog = None
         self.selected_items = []
         self.total_price = 0
@@ -540,7 +544,7 @@ class GuestPage:
     def add_order(self, menu_items: list[int]):
         items = [user_manager.get_menu_item_by_id(m_id) for m_id in menu_items]
         order = Order(total_price=self.total_price, menu_items=items,
-                      status=OrderStatus.CREATED)
+                      status=OrderStatus.CREATED, user_id=self.get_login_user_data()['id'])
         with Session(engine) as session:
             session.add(order)
             session.commit()
@@ -630,9 +634,11 @@ class PizzeriaApp(MDApp):
         self.screen_manager = ScreenManager()
         self.guest_page = GuestPage(screen_manager=self.screen_manager,
                                     show_admin_login_screen=self.login_page_entrance,
-                                    admin_login_page_entrance=self.admin_login_page_entrance)
+                                    admin_login_page_entrance=self.admin_login_page_entrance,
+                                    get_login_user_data=self.get_logged_in_user)
         self.admin_page = AdminPage(screen_manager=self.screen_manager,
-                                    login_page_entrance=self.login_page_entrance)
+                                    login_page_entrance=self.login_page_entrance,
+                                    get_login_user_data=self.get_logged_in_user)
         self.login_page = LoginPage(screen_manager=self.screen_manager,
                                     admin_password=self.admin_password,
                                     admin_username=self.admin_username,
@@ -648,6 +654,9 @@ class PizzeriaApp(MDApp):
 
     def admin_login_page_entrance(self, *_):
         self.login_page.show_admin_login_screen()
+
+    def get_logged_in_user(self, *_):
+        return self.login_page.get_logged_in_user()
 
 
 if __name__ == '__main__':
