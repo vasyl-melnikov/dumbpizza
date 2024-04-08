@@ -1,6 +1,7 @@
 import os.path
 import time
 from enum import Enum
+from typing import Dict
 
 from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
@@ -30,6 +31,9 @@ from managers import AdminManager, UserManager
 
 # SQLite database URL
 DATABASE_URL = "sqlite:///./pizzeria.db"
+
+# User session info
+SESSION_FILE = 'session_data.txt'
 
 # Set up SQLite database
 engine = create_engine(DATABASE_URL, echo=True)
@@ -342,14 +346,16 @@ class AdminPage:
 
         # Add a label indicating to upload a photo
         upload_label = MDLabel(text="Upload Your Photo", size_hint_y=None,
-                             height=dp(40))
+                               height=dp(40))
         popup_content.add_widget(upload_label)
 
         # Add a file chooser for uploading a photo
         file_chooser = FileChooserIconView(height=300)
         file_chooser.path = '.'  # Set initial path
+
         def set_img(path):
             self.selected_img = path[0]
+
         file_chooser.bind(
             on_submit=lambda chooser, path, _: set_img(path))
         popup_content.add_widget(file_chooser)
@@ -376,7 +382,7 @@ class AdminPage:
                 float(price_input.text),
                 description_input.text,
                 float(weight_input.text),
-                float(radius_input.text)))# Pass the selected photo preview
+                float(radius_input.text)))  # Pass the selected photo preview
         popup_content.add_widget(save_button)
 
         # Create and open the popup
@@ -425,27 +431,73 @@ class LoginPage:
         self.guest_page_entrance = guest_page_entrance
         self.dialog = None
 
+    def get_logged_in_user(self) -> dict[str, str] | None:
+        if os.path.exists(SESSION_FILE):
+            with open(SESSION_FILE, 'r') as file:
+                data = file.read().split(',')
+                if len(data) == 3:
+                    return {'firstname': data[0], 'lastname': data[1], 'phone': data[2]}
+        return None
+
     def show_login_screen(self):
+
+        if self.get_logged_in_user() is not None:
+            self.login_as_guest(self)
+
         layout = MDBoxLayout(orientation='vertical', padding=dp(48),
                              spacing=dp(24))
-        username_field = MDTextField(hint_text="Username", required=True)
-        password_field = MDTextField(hint_text="Password", required=True,
-                                     password=True)
-        login_button = MDRaisedButton(text="Login",
-                                      on_release=lambda x: self.login(
-                                          username_field.text,
-                                          password_field.text))
-        guest_button = MDRaisedButton(text="Login as Guest",
-                                      on_release=self.login_as_guest)
-        layout.add_widget(username_field)
-        layout.add_widget(password_field)
-        layout.add_widget(login_button)
-        layout.add_widget(guest_button)
+        first_name_field = MDTextField(hint_text="First Name", required=True)
+        last_name_field = MDTextField(hint_text="Last Name", required=True)
+        phone_number_field = MDTextField(hint_text="Phone Number", required=True)
+
+        register_button = MDRaisedButton(text="Register",
+                                         on_release=lambda x: self.register_user(
+                                             first_name_field.text,
+                                             last_name_field.text,
+                                             phone_number_field.text))
+        login_as_admin_button = MDRaisedButton(text="Admin Login",
+                                               on_release=self.show_admin_login_screen)
+        layout.add_widget(first_name_field)
+        layout.add_widget(last_name_field)
+        layout.add_widget(phone_number_field)
+        layout.add_widget(register_button)
+        layout.add_widget(login_as_admin_button)
         login_screen = Screen(name='login')
         login_screen.add_widget(layout)
         self.screen_manager.add_widget(login_screen)
 
-    def login(self, username, password):
+    def register_user(self, first_name, last_name, phone_num):
+        user = User(first_name=first_name, last_name=last_name, phone_number=int(phone_num))
+        user_manager.add_user(user)
+
+        new_user = user_manager.get_user(phone_num)
+
+        with open(SESSION_FILE, 'w') as file:
+            file.write(f"{new_user.id},{first_name},{last_name},{phone_num}")
+
+        self.login_as_guest(self)
+
+    def show_admin_login_screen(self, instance):
+        self.screen_manager.clear_widgets()
+
+        layout = MDBoxLayout(orientation='vertical', padding=dp(48),
+                             spacing=dp(24))
+        username_field = MDTextField(hint_text="Username", required=True)
+        password_field = MDTextField(hint_text="Password", required=True, password=True)
+
+        login_button = MDRaisedButton(text="Login",
+                                      on_release=lambda x: self.login_admin(
+                                          username_field.text,
+                                          password_field.text))
+
+        layout.add_widget(username_field)
+        layout.add_widget(password_field)
+        layout.add_widget(login_button)
+        login_screen = Screen(name='admin_login')
+        login_screen.add_widget(layout)
+        self.screen_manager.add_widget(login_screen)
+
+    def login_admin(self, username, password):
         if username == self.admin_username and password == self.admin_password:
             self.screen_manager.clear_widgets()
             self.admin_page_entrance()
@@ -469,9 +521,9 @@ class LoginPage:
 
 
 class GuestPage:
-    def __init__(self, screen_manager, login_page_entrance):
+    def __init__(self, screen_manager, show_admin_login_screen):
         self.screen_manager = screen_manager
-        self.login_page_entrance = login_page_entrance
+        self.show_admin_login_screen = show_admin_login_screen
         self.dialog = None
         self.selected_items = []
         self.total_price = 0
@@ -510,7 +562,7 @@ class GuestPage:
         order_button = MDRaisedButton(text="Place Order",
                                       pos_hint={'center_x': 0.5},
                                       on_release=self.place_order)
-        back_button = MDRaisedButton(text="Back to Login",
+        back_button = MDRaisedButton(text="Admin Login",
                                      pos_hint={'center_x': 0.5},
                                      on_release=self.back_to_login)
         layout.add_widget(order_button)
@@ -551,7 +603,7 @@ class GuestPage:
 
     def back_to_login(self, instance):
         self.screen_manager.clear_widgets()
-        self.login_page_entrance()
+        self.show_admin_login_screen()
 
     def dismiss_dialog(self, instance):
         if self.dialog is not None:
@@ -568,7 +620,7 @@ class PizzeriaApp(MDApp):
         self.theme_cls.primary_palette = "Blue"
         self.screen_manager = ScreenManager()
         self.guest_page = GuestPage(screen_manager=self.screen_manager,
-                                    login_page_entrance=self.login_page_entrance)
+                                    show_admin_login_screen=self.login_page_entrance)
         self.admin_page = AdminPage(screen_manager=self.screen_manager,
                                     login_page_entrance=self.login_page_entrance)
         self.login_page = LoginPage(screen_manager=self.screen_manager,

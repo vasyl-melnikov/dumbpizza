@@ -74,6 +74,17 @@ class UserManager:
     def __init__(self, db):
         self.__db = db
 
+    def add_user(self, user: User) -> None:
+        with Session(self.__db) as session:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+    def get_user(self, number: int) -> User:
+        with Session(self.__db) as session:
+            statement = select(User).where(User.phone_number == number)
+            return session.exec(statement).one()
+
     def get_menu_items(self) -> list[MenuItem]:
         with Session(self.__db) as session:
             return session.query(MenuItem).all()
