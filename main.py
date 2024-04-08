@@ -1,20 +1,25 @@
 import os.path
 
-from kivy.metrics import dp
+from kivy.metrics import dp, sp
+from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
 from kivy.uix.filechooser import FileChooserIconView
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import AsyncImage, Image
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDIconButton
+from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDIconButton, \
+    MDRectangleFlatButton
 from kivymd.uix.card import MDCard
 from kivymd.uix.dialog import MDDialog
+from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
 from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.textfield import MDTextField
 from kivy.uix.scrollview import ScrollView
 from kivymd.uix.list import OneLineListItem, MDList
@@ -89,57 +94,88 @@ class AdminPage:
         orders_screen = Screen(name='orders')
 
         # Create a scrollable view for orders list
-        orders_scroll_view = ScrollView()
-        orders_list = MDList(padding=dp(24), spacing=dp(16))
+        orders_scroll_view = MDScrollView()
+
+        # Create a grid layout for orders list
+        orders_grid = MDGridLayout(cols=1, padding=dp(12), spacing=dp(12),
+                                   size_hint_y=None)
+        orders_grid.bind(minimum_height=orders_grid.setter('height'))
+
         for order in admin_manager.get_all_orders():
-            card = MDCard(size_hint=(None, None), size=(1000, 200),
+            # Create a card for each order
+            card = MDCard(size_hint=(None, None), size=(dp(700), dp(250)),
                           padding=dp(16), spacing=dp(8))
-            card.add_widget(MDLabel(text=f"Order ID: {order.id}",
-                                    font_style='Subtitle1'))
-            card.add_widget(MDLabel(text=f"Created at: {order.created_at}",
-                                    font_style='Subtitle1'))
-            card.add_widget(MDLabel(text=f"Status: {order.status}",
-                                    font_style='Subtitle1'))
-            card.add_widget(MDLabel(text=f"{order.user.dict()}",
-                                    font_style='Subtitle1'))
 
-            menu_items_text = ""
-            for menu_item in order.menu_items:
-                menu_items_text += f"{menu_item.name} - ${menu_item.price}\n"
             card.add_widget(
-                MDLabel(text=menu_items_text, font_style='Body1',
-                        height=dp(100)))
+                MDLabel(text=f"[color=008080]Order ID:[/color] {order.id}",
+                        font_size=sp(16), markup=True))
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Created at:[/color] {order.created_at.strftime('%m/%d/%Y, %H:%M:%S')}",
+                font_size=sp(16), markup=True))
+            card.add_widget(
+                MDLabel(text=f"[color=008080]Status:[/color] {order.status}",
+                        font_size=sp(16), markup=True))
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Guest name:[/color] {order.user.first_name}",
+                font_size=sp(16), markup=True))
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Guest last name:[/color] {order.user.last_name}",
+                font_size=sp(16), markup=True))
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Guest phone number:[/color] {order.user.phone_number}",
+                font_size=sp(16), markup=True))
+            menu_items_text = "["
+            for menu_item in order.menu_items:
+                menu_items_text += f"{menu_item.name},\n"
+            menu_items_text += "]"
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Menu Items:[/color]\n{menu_items_text}",
+                font_size=sp(16), markup=True))
 
-            # Add buttons for controlling order status
-            status_button = MDIconButton(
-                icon="checkbox-blank-circle-outline",
-                pos_hint={'center_x': 0.5})
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Total price of order:[/color] {order.total_price}",
+                font_size=sp(16), markup=True))
+
+            # Add button for controlling order status
+            status_button = MDRectangleFlatButton(text='Change status',
+                                                  size_hint=(None, None),
+                                                  size=(dp(150), dp(50)))
             status_button.order_id = order.id
             status_button.bind(on_release=self.show_status_menu)
             card.add_widget(status_button)
-            orders_list.add_widget(card)
 
-        orders_scroll_view.add_widget(orders_list)
+            # Add card to the grid layout
+            orders_grid.add_widget(card)
 
-        # Create buttons section as a footer
-        buttons_layout = BoxLayout(orientation='horizontal', padding=dp(12),
-                                   spacing=dp(12), height=dp(120))
-        add_item_button = MDRaisedButton(text="Add Item", size_hint_x=None,
-                                         width=dp(120),
-                                         on_release=self.add_menu_item)
-        back_button = MDRaisedButton(text="Back to Login", size_hint_x=None,
-                                     width=dp(120),
-                                     on_release=self.back_to_login)
-        orders_menu = MDRaisedButton(text="Menu", size_hint_x=None,
-                                     width=dp(120),
-                                     on_release=self.back_to_menu)
+        # Add grid layout to the scrollable view
+        orders_scroll_view.add_widget(orders_grid)
+
+        # Create footer buttons
+        add_item_button = MDRectangleFlatButton(text="Add Item",
+                                                size_hint=(None, None),
+                                                size=(dp(150), dp(50)),
+                                                on_release=self.add_menu_item)
+        back_button = MDRectangleFlatButton(text="Back to Login",
+                                            size_hint=(None, None),
+                                            size=(dp(150), dp(50)),
+                                            on_release=self.back_to_login)
+        orders_menu = MDRectangleFlatButton(text="Menu",
+                                            size_hint=(None, None),
+                                            size=(dp(150), dp(50)),
+                                            on_release=self.back_to_menu)
+
+        # Create grid layout for footer buttons
+        buttons_layout = MDGridLayout(cols=3, padding=dp(12),
+                                      spacing=dp(12))
         buttons_layout.add_widget(orders_menu)
         buttons_layout.add_widget(add_item_button)
         buttons_layout.add_widget(back_button)
 
+        # Add scrollable view and footer buttons to the screen
         orders_screen.add_widget(orders_scroll_view)
         orders_screen.add_widget(buttons_layout)
 
+        # Add the screen to the screen manager
         self.screen_manager.add_widget(orders_screen)
 
     def show_status_menu(self, button):
@@ -472,7 +508,7 @@ class LoginPage:
             dialog.open()
             self.dialog = dialog
         else:
-            user = User(first_name=first_name, last_name=last_name, phone_number=int(phone_num))
+            user = User(first_name=first_name, last_name=last_name, phone_number=str(phone_num))
             user_manager.add_user(user)
 
             new_user = user_manager.get_user(phone_num)
@@ -542,7 +578,7 @@ class GuestPage:
     def add_order(self, menu_items: list[int]):
         items = [user_manager.get_menu_item_by_id(m_id) for m_id in menu_items]
         order = Order(total_price=self.total_price, menu_items=items,
-                      status=OrderStatus.CREATED)
+                      status=OrderStatus.CREATED, user_id=get_logged_in_user()['id'])
         with Session(engine) as session:
             session.add(order)
             session.commit()
