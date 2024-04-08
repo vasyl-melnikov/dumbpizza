@@ -17,7 +17,7 @@ class User(SQLModel, table=True):
     first_name: str
     last_name: str
     phone_number: int
-    # orders: list["Order"] = Relationship(back_populates="user")
+    orders: list["Order"] = Relationship(back_populates="user")
 
 
 class Admin(SQLModel, table=True):
@@ -52,5 +52,7 @@ class Order(SQLModel, table=True):
     )
     total_price: float
     status: OrderStatus = Field()
+    user_id: int | None = Field(default=None, foreign_key="user.id")
+    user: User | None = Relationship(back_populates="orders")
     menu_items: list[MenuItem] = Relationship(back_populates="orders",
                                               link_model=OrderMenuItems)

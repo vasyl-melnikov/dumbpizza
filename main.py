@@ -17,6 +17,7 @@ from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDIconButton
 from kivymd.uix.card import MDCard
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.dropdownitem import MDDropDownItem
+from kivymd.uix.filemanager import MDFileManager
 from kivymd.uix.label import MDLabel
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.textfield import MDTextField
@@ -93,10 +94,17 @@ class AdminPage:
         orders_scroll_view = ScrollView()
         orders_list = MDList(padding=dp(24), spacing=dp(16))
         for order in admin_manager.get_all_orders():
-            card = MDCard(size_hint=(None, None), size=(800, 200),
+            card = MDCard(size_hint=(None, None), size=(1000, 200),
                           padding=dp(16), spacing=dp(8))
             card.add_widget(MDLabel(text=f"Order ID: {order.id}",
                                     font_style='Subtitle1'))
+            card.add_widget(MDLabel(text=f"Created at: {order.created_at}",
+                                    font_style='Subtitle1'))
+            card.add_widget(MDLabel(text=f"Status: {order.status}",
+                                    font_style='Subtitle1'))
+            card.add_widget(MDLabel(text=f"{order.user.dict()}",
+                                    font_style='Subtitle1'))
+
             menu_items_text = ""
             for menu_item in order.menu_items:
                 menu_items_text += f"{menu_item.name} - ${menu_item.price}\n"
@@ -164,9 +172,12 @@ class AdminPage:
         )
         # menu.bind(on_release=self.on_status_change)  # Bind on_release event
         menu.open()
+        self.dialog = menu
 
     def on_status_change(self, order_id: int, status: str):
-        print(order_id, status)
+        admin_manager.update_order_status(order_id, OrderStatus(status))
+        self.dismiss_dialog()
+        self.back_to_orders()
 
     def show_admin_menu_screen(self):
         menu_list = MDList(padding=dp(24), spacing=dp(16))
@@ -177,7 +188,9 @@ class AdminPage:
             card.md_bg_color = "#808080"
             card.add_widget(
                 MDLabel(text=item.name, halign='center', font_style='H6'))
-            card.add_widget(MDLabel(text=f"${item.price}", halign='center'))
+            card.add_widget(MDLabel(text=f"Price: ${item.price}", halign='center'))
+            card.add_widget(MDLabel(text=f"Weight: {item.weight}", halign='center'))
+            card.add_widget(MDLabel(text=f"Radius: {item.radius}", halign='center'))
             card.add_widget(MDLabel(text=item.description, halign='left'))
             if not os.path.exists('assets'):
                 os.mkdir('assets')
@@ -230,11 +243,11 @@ class AdminPage:
                                   spacing=dp(16))
 
         # Add text input fields for editing menu item properties
-        name_input = TextInput(text=item.name, hint_text="Name")
-        price_input = TextInput(text=str(item.price), hint_text="Price")
-        weight_input = TextInput(text=str(item.weight), hint_text="Weight")
-        radius_input = TextInput(text=str(item.radius), hint_text="Radius")
-        description_input = TextInput(text=item.description,
+        name_input = MDTextField(text=item.name, hint_text="Name",  foreground_color=(0, 0, 0, .4))
+        price_input = MDTextField(text=str(item.price), hint_text="Price")
+        weight_input = MDTextField(text=str(item.weight), hint_text="Weight")
+        radius_input = MDTextField(text=str(item.radius), hint_text="Radius")
+        description_input = MDTextField(text=item.description,
                                       hint_text="Description")
 
         popup_content.add_widget(name_input)
@@ -244,7 +257,7 @@ class AdminPage:
         popup_content.add_widget(description_input)
 
         # Add a button to select a new image
-        choose_image_button = Button(text="Choose Image")
+        choose_image_button = MDRaisedButton(text="Choose Image")
         choose_image_button.bind(
             on_release=lambda button: self.choose_image(popup_content))
         popup_content.add_widget(choose_image_button)
@@ -266,11 +279,15 @@ class AdminPage:
 
         # Create and open the popup
         popup = Popup(title="Edit Menu Item", content=popup_content,
-                      size_hint=(None, None), size=(800, 900))
+                      size_hint=(None, None), size=(800, 1200),
+                      separator_color=[0, 0, 0, 1],
+                      background_color=[255, 255, 255, 255],
+                      )
         popup.open()
         self.dialog = popup
 
     def choose_image(self, popup_content):
+        self.dialog.background_color = [0, 0, 0, 1]
         # Create a file chooser to select an image
         file_chooser = FileChooserIconView()
         file_chooser.path = '.'  # Set initial path
@@ -321,7 +338,7 @@ class AdminPage:
     def add_menu_item(self, _):
         # Create a popup window for adding a new menu item
         popup_content = BoxLayout(orientation='vertical', padding=dp(24),
-                                  spacing=dp(16))
+                                  spacing=dp(4))
 
         # Add a label indicating to upload a photo
         upload_label = MDLabel(text="Upload Your Photo", size_hint_y=None,
@@ -329,7 +346,7 @@ class AdminPage:
         popup_content.add_widget(upload_label)
 
         # Add a file chooser for uploading a photo
-        file_chooser = FileChooserIconView(size_hint_y=0.8, height=120)
+        file_chooser = FileChooserIconView(height=300)
         file_chooser.path = '.'  # Set initial path
         def set_img(path):
             self.selected_img = path[0]
@@ -338,11 +355,11 @@ class AdminPage:
         popup_content.add_widget(file_chooser)
 
         # Add text input fields for editing menu item properties
-        name_input = TextInput(hint_text="Name")
-        price_input = TextInput(hint_text="Price")
-        weight_input = TextInput(hint_text="Weight")
-        radius_input = TextInput(hint_text="Radius")
-        description_input = TextInput(hint_text="Description")
+        name_input = MDTextField(hint_text="Name", size=(50, 50))
+        price_input = MDTextField(hint_text="Price", size=(50, 50))
+        weight_input = MDTextField(hint_text="Weight", size=(50, 50))
+        radius_input = MDTextField(hint_text="Radius", size=(50, 50))
+        description_input = MDTextField(hint_text="Description", size=(50, 50))
 
         popup_content.add_widget(name_input)
         popup_content.add_widget(price_input)
@@ -364,7 +381,10 @@ class AdminPage:
 
         # Create and open the popup
         popup = Popup(title="Add new menu item", content=popup_content,
-                      size_hint=(None, None), size=(800, 1200))
+                      size_hint=(None, None), size=(800, 1300),
+                      # separator_color=[0, 0, 0, 1],
+                      # background_color=[255, 255, 255, 255],
+                      )
         popup.open()
         self.dialog = popup
 
@@ -566,5 +586,5 @@ class PizzeriaApp(MDApp):
 
 
 if __name__ == '__main__':
-    # gen_metadata()
+    gen_metadata()
     PizzeriaApp().run()
