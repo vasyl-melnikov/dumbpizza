@@ -16,7 +16,7 @@ class User(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     first_name: str
     last_name: str
-    phone_number: int
+    phone_number: str
     orders: list["Order"] = Relationship(back_populates="user")
 
 
