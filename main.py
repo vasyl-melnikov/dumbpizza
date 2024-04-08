@@ -241,12 +241,12 @@ class AdminPage:
                                   spacing=dp(16))
 
         # Add text input fields for editing menu item properties
-        name_input = MDTextField(text=item.name, hint_text="Name",  foreground_color=(0, 0, 0, .4))
+        name_input = MDTextField(text=item.name, hint_text="Name", foreground_color=(0, 0, 0, .4))
         price_input = MDTextField(text=str(item.price), hint_text="Price")
         weight_input = MDTextField(text=str(item.weight), hint_text="Weight")
         radius_input = MDTextField(text=str(item.radius), hint_text="Radius")
         description_input = MDTextField(text=item.description,
-                                      hint_text="Description")
+                                        hint_text="Description")
 
         popup_content.add_widget(name_input)
         popup_content.add_widget(price_input)
@@ -415,6 +415,15 @@ class AdminPage:
         self.show_admin_order_screen()
 
 
+def get_logged_in_user() -> dict[str, str] | None:
+    if os.path.exists(SESSION_FILE):
+        with open(SESSION_FILE, 'r') as file:
+            data = file.read().split(',')
+            if len(data) == 4:
+                return {'id': data[0], 'first_name': data[1], 'last_name': data[2], 'phone_number': data[3]}
+    return None
+
+
 class LoginPage:
     def __init__(self, screen_manager, admin_username,
                  admin_password, admin_page_entrance, guest_page_entrance):
@@ -425,17 +434,9 @@ class LoginPage:
         self.guest_page_entrance = guest_page_entrance
         self.dialog = None
 
-    def get_logged_in_user(self) -> dict[str, str] | None:
-        if os.path.exists(SESSION_FILE):
-            with open(SESSION_FILE, 'r') as file:
-                data = file.read().split(',')
-                if len(data) == 4:
-                    return {'id': data[0],'first_name': data[1], 'last_name': data[2], 'phone_number': data[3]}
-        return None
-
     def show_login_screen(self, *_):
         self.screen_manager.clear_widgets()
-        if self.get_logged_in_user() is not None:
+        if get_logged_in_user() is not None:
             self.login_as_guest(self)
 
         layout = MDBoxLayout(orientation='vertical', padding=dp(48),
@@ -529,8 +530,9 @@ class LoginPage:
 
 class GuestPage:
     def __init__(self, screen_manager, show_admin_login_screen,
-                 admin_login_page_entrance):
+                 admin_login_page_entrance, show_login_screen):
         self.screen_manager = screen_manager
+        self.show_login_screen = show_login_screen
         self.show_admin_login_screen = show_admin_login_screen
         self.admin_login_page_entrance = admin_login_page_entrance
         self.dialog = None
@@ -545,7 +547,9 @@ class GuestPage:
             session.add(order)
             session.commit()
 
-    def show_guest_screen(self):
+    def show_guest_screen(self, *_):
+        self.screen_manager.clear_widgets()
+
         guest_screen = Screen(name='guest')
         layout = MDBoxLayout(orientation='vertical', spacing=dp(10))
         scroll_view = ScrollView()
@@ -574,10 +578,90 @@ class GuestPage:
         back_button = MDRaisedButton(text="Admin Login",
                                      pos_hint={'center_x': 0.5},
                                      on_release=self.admin_login_page_entrance)
+
+        edit_profile_button = MDRaisedButton(text="Edit Profile",
+                                             pos_hint={'center_x': 0.5},
+                                             on_release=self.edit_credentials_page)
+
+        logout_button = MDRaisedButton(text="Logout",
+                                       pos_hint={'center_x': 0.5},
+                                       on_release=self.logout)
         layout.add_widget(order_button)
         layout.add_widget(back_button)
+        layout.add_widget(edit_profile_button)
+        layout.add_widget(logout_button)
         guest_screen.add_widget(layout)
         self.screen_manager.add_widget(guest_screen)
+
+    def logout(self, *_):
+        if os.path.exists(SESSION_FILE):
+            user_id: int = int(get_logged_in_user().get("id"))
+            user_manager.delete_user(user_id)
+            os.remove(SESSION_FILE)
+            self.screen_manager.clear_widgets()
+            self.show_login_screen()
+
+    def edit_credentials_page(self, *_):
+
+        self.screen_manager.clear_widgets()
+
+        user_credentials: dict[str, str] = get_logged_in_user()
+        self.screen_manager.clear_widgets()
+
+        layout = MDBoxLayout(orientation='vertical', padding=dp(48),
+                             spacing=dp(24))
+        first_name_field = MDTextField(text=user_credentials.get("first_name"), hint_text="First Name", required=True)
+        last_name_field = MDTextField(text=user_credentials.get("last_name"), hint_text="Last Name", required=True)
+        phone_num_field = MDTextField(text=user_credentials.get("phone_number"), hint_text="Phone Number", required=True)
+
+        save_changes_button = MDRaisedButton(text="Save",
+                                             on_release=lambda x: self.save_changes(
+                                                 first_name_field.text,
+                                                 last_name_field.text,
+                                                 phone_num_field.text))
+
+        guest_screen_button = MDRaisedButton(text="Main page",
+                                             on_release=self.show_guest_screen)
+
+        layout.add_widget(first_name_field)
+        layout.add_widget(last_name_field)
+        layout.add_widget(phone_num_field)
+        layout.add_widget(save_changes_button)
+        layout.add_widget(guest_screen_button)
+        login_screen = Screen(name='edit_credentials')
+        login_screen.add_widget(layout)
+        self.screen_manager.add_widget(login_screen)
+
+    def save_changes(self, first_name, last_name, phone_num):
+        if not first_name or not last_name or not phone_num:
+            dialog = MDDialog(title="Invalid Credentials",
+                              text="Please enter valid credentials.",
+                              size_hint=(0.7, 0.3),
+                              auto_dismiss=True,
+                              buttons=[MDFlatButton(text="OK",
+                                                    on_release=self.dismiss_dialog)])
+            dialog.open()
+            self.dialog = dialog
+        else:
+            old_phone_number: int = int(get_logged_in_user().get("phone_number"))
+            user = User(first_name=first_name, last_name=last_name, phone_number=int(phone_num))
+            new_user = user_manager.update_user(old_phone_number, user)
+
+            if not new_user:
+                dialog = MDDialog(title="Invalid User",
+                                  text="User with current credentials doesn't exist.",
+                                  size_hint=(0.7, 0.3),
+                                  auto_dismiss=True,
+                                  buttons=[MDFlatButton(text="OK",
+                                                        on_release=self.dismiss_dialog)])
+                dialog.open()
+                self.dialog = dialog
+            else:
+                with open(SESSION_FILE, 'w') as file:
+                    file.write(f"{new_user.id},{first_name},{last_name},{phone_num}")
+
+            self.screen_manager.clear_widgets()
+            self.show_guest_screen()
 
     def on_checkbox_active(self, checkbox, value):
         if value:
@@ -630,7 +714,8 @@ class PizzeriaApp(MDApp):
         self.screen_manager = ScreenManager()
         self.guest_page = GuestPage(screen_manager=self.screen_manager,
                                     show_admin_login_screen=self.login_page_entrance,
-                                    admin_login_page_entrance=self.admin_login_page_entrance)
+                                    admin_login_page_entrance=self.admin_login_page_entrance,
+                                    show_login_screen=self.login_page_entrance)
         self.admin_page = AdminPage(screen_manager=self.screen_manager,
                                     login_page_entrance=self.login_page_entrance)
         self.login_page = LoginPage(screen_manager=self.screen_manager,
@@ -651,5 +736,5 @@ class PizzeriaApp(MDApp):
 
 
 if __name__ == '__main__':
-    gen_metadata()
+    # gen_metadata()
     PizzeriaApp().run()

@@ -80,6 +80,29 @@ class UserManager:
             session.commit()
             session.refresh(user)
 
+    def delete_user(self, user_id: int) -> None:
+        with Session(self.__db) as session:
+            statement = select(User).where(User.id == user_id)
+            user = session.exec(statement).one()
+            if user:
+                session.delete(user)
+                session.commit()
+
+    def update_user(self, old_phone_number: int, user: User) -> User | None:
+        with Session(self.__db) as session:
+            statement = select(User).where(User.phone_number == old_phone_number)
+            old_user = session.exec(statement).one()
+            if old_user:
+                old_user.first_name = user.first_name
+                old_user.last_name = user.last_name
+                old_user.phone_number = user.phone_number
+                session.commit()
+                session.refresh(old_user)
+                return old_user
+            else:
+                print("USERA NEMA TAKOGO")
+                return None
+
     def get_user(self, number: int) -> User:
         with Session(self.__db) as session:
             statement = select(User).where(User.phone_number == number)
@@ -103,9 +126,3 @@ class UserManager:
         with Session(self.__db) as session:
             statement = select(User).where(User.id == user_id)
             return session.exec(statement).one().orders
-
-
-
-
-
-
