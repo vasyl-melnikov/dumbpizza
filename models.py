@@ -17,7 +17,7 @@ class User(SQLModel, table=True):
     first_name: str
     last_name: str
     phone_number: str
-    orders: list["Order"] = Relationship(back_populates="user")
+    orders: list["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "delete"})
 
 
 class Admin(SQLModel, table=True):
