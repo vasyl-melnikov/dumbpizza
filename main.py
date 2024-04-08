@@ -1,3 +1,5 @@
+import os.path
+import time
 from enum import Enum
 
 from kivy.metrics import dp
@@ -99,7 +101,8 @@ class AdminPage:
             for menu_item in order.menu_items:
                 menu_items_text += f"{menu_item.name} - ${menu_item.price}\n"
             card.add_widget(
-                MDLabel(text=menu_items_text, font_style='Body1', height=dp(100)))
+                MDLabel(text=menu_items_text, font_style='Body1',
+                        height=dp(100)))
 
             # Add buttons for controlling order status
             status_button = MDIconButton(
@@ -117,7 +120,7 @@ class AdminPage:
                                    spacing=dp(12), height=dp(120))
         add_item_button = MDRaisedButton(text="Add Item", size_hint_x=None,
                                          width=dp(120),
-                                         on_release=self.add_item)
+                                         on_release=self.add_menu_item)
         back_button = MDRaisedButton(text="Back to Login", size_hint_x=None,
                                      width=dp(120),
                                      on_release=self.back_to_login)
@@ -176,9 +179,9 @@ class AdminPage:
                 MDLabel(text=item.name, halign='center', font_style='H6'))
             card.add_widget(MDLabel(text=f"${item.price}", halign='center'))
             card.add_widget(MDLabel(text=item.description, halign='left'))
-            with open(f'assets/menu_item{item.id}.jpg', 'wb') as f:
+            with open(os.path.join(f'assets', f'menu_item{item.id}.jpg'), 'wb') as f:
                 f.write(base64.b64decode(item.image))
-            card.add_widget(AsyncImage(source=f'assets/menu_item{item.id}.jpg',
+            card.add_widget(AsyncImage(source=os.path.join(f'assets', f'menu_item{item.id}.jpg'),
                                        nocache=True))
 
             # Add an "Edit" button to each menu item card
@@ -199,7 +202,7 @@ class AdminPage:
                                      spacing=dp(12))
         add_item_button = MDRaisedButton(text="Add Item", size_hint_x=None,
                                          width=dp(120),
-                                         on_release=self.add_item)
+                                         on_release=self.add_menu_item)
         back_button = MDRaisedButton(text="Back to Login", size_hint_x=None,
                                      width=dp(120),
                                      on_release=self.back_to_login)
@@ -250,16 +253,20 @@ class AdminPage:
         save_button.bind(
             on_release=lambda button: self.save_menu_item_changes(item,
                                                                   name_input.text,
-                                                                  float(price_input.text),
+                                                                  float(
+                                                                      price_input.text),
                                                                   description_input.text,
-                                                                  float(weight_input.text),
-                                                                  float(radius_input.text)))
+                                                                  float(
+                                                                      weight_input.text),
+                                                                  float(
+                                                                      radius_input.text)))
         popup_content.add_widget(save_button)
 
         # Create and open the popup
         popup = Popup(title="Edit Menu Item", content=popup_content,
                       size_hint=(None, None), size=(800, 900))
         popup.open()
+        self.dialog = popup
 
     def choose_image(self, popup_content):
         # Create a file chooser to select an image
@@ -267,7 +274,7 @@ class AdminPage:
         file_chooser.path = '.'  # Set initial path
         file_chooser.bind(
             on_submit=lambda chooser, path, _: self.on_image_selected(path,
-                                                                   popup_content))
+                                                                      popup_content))
 
         # Clear existing widgets and add the file chooser
         popup_content.clear_widgets()
@@ -287,42 +294,101 @@ class AdminPage:
     def upload_image(self, path):
         with open(path[0], 'rb') as f:
             img_data = f.read()
-        self.cur_menu_item_edit.image = base64.b64encode(img_data).decode('utf-8')
+        self.cur_menu_item_edit.image = base64.b64encode(img_data).decode(
+            'utf-8')
         admin_manager.insert_menu_item(self.cur_menu_item_edit)
         self.cur_menu_item_edit = None
+        self.dismiss_dialog()
+        # self.back_to_menu()
 
-    def save_menu_item_changes(self, item, name, price, description, weight, radius):
+    def save_menu_item_changes(self, item, name, price, description, weight,
+                               radius):
         item.name = name
         item.price = price
         item.description = description
         item.weight = weight
         item.radius = radius
         admin_manager.insert_menu_item(item)
+        self.dismiss_dialog()
+        self.back_to_menu()
 
-    def dismiss_dialog(self, instance):
+    def dismiss_dialog(self, *_):
         if self.dialog is not None:
             self.dialog.dismiss()
 
-    def add_item(self, instance):
-        dialog = MDDialog(title="Add Menu Item",
-                          size_hint=(0.7, 0.3),
-                          auto_dismiss=False,
-                          buttons=[MDRaisedButton(text="Add",
-                                                  on_release=self.dismiss_dialog),
-                                   MDFlatButton(text="Cancel",
-                                                on_release=self.dismiss_dialog)])
-        dialog.open()
-        self.dialog = dialog
+    def add_menu_item(self, _):
+        # Create a popup window for adding a new menu item
+        popup_content = BoxLayout(orientation='vertical', padding=dp(24),
+                                  spacing=dp(16))
 
-    def back_to_login(self, instance):
+        # Add a label indicating to upload a photo
+        upload_label = MDLabel(text="Upload Your Photo", size_hint_y=None,
+                             height=dp(40))
+        popup_content.add_widget(upload_label)
+
+        # Add a file chooser for uploading a photo
+        file_chooser = FileChooserIconView(size_hint_y=0.8, height=120)
+        file_chooser.path = '.'  # Set initial path
+        def set_img(path):
+            self.selected_img = path[0]
+        file_chooser.bind(
+            on_submit=lambda chooser, path, _: set_img(path))
+        popup_content.add_widget(file_chooser)
+
+        # Add text input fields for editing menu item properties
+        name_input = TextInput(hint_text="Name")
+        price_input = TextInput(hint_text="Price")
+        weight_input = TextInput(hint_text="Weight")
+        radius_input = TextInput(hint_text="Radius")
+        description_input = TextInput(hint_text="Description")
+
+        popup_content.add_widget(name_input)
+        popup_content.add_widget(price_input)
+        popup_content.add_widget(weight_input)
+        popup_content.add_widget(radius_input)
+        popup_content.add_widget(description_input)
+
+        # Add a button to save changes
+        save_button = MDRaisedButton(text="Save Changes",
+                                     size_hint=(None, None), size=(150, 50))
+        save_button.bind(
+            on_release=lambda button: self.save_add_menu_item_changes(
+                name_input.text,
+                float(price_input.text),
+                description_input.text,
+                float(weight_input.text),
+                float(radius_input.text)))# Pass the selected photo preview
+        popup_content.add_widget(save_button)
+
+        # Create and open the popup
+        popup = Popup(title="Add new menu item", content=popup_content,
+                      size_hint=(None, None), size=(800, 1200))
+        popup.open()
+        self.dialog = popup
+
+    def save_add_menu_item_changes(self, name, price, description, weight,
+                                   radius):
+        # Handle saving the new menu item, including the photo
+        item = MenuItem()
+        item.name = name
+        item.price = price
+        item.description = description
+        item.weight = weight
+        item.radius = radius
+        item.photo_path = self.selected_img  # Save the selected photo path
+        admin_manager.insert_menu_item(item)
+        self.dismiss_dialog()
+        self.back_to_menu()
+
+    def back_to_login(self, *_):
         self.screen_manager.clear_widgets()
         self.login_page_entrance()
 
-    def back_to_menu(self, instance):
+    def back_to_menu(self, *_):
         self.screen_manager.clear_widgets()
         self.show_admin_menu_screen()
 
-    def back_to_orders(self, instance):
+    def back_to_orders(self, *_):
         self.screen_manager.clear_widgets()
         self.show_admin_order_screen()
 
@@ -390,7 +456,8 @@ class GuestPage:
 
     def add_order(self, menu_items: list[int]):
         items = [user_manager.get_menu_item_by_id(m_id) for m_id in menu_items]
-        order = Order(total_price=self.total_price, menu_items=items, status=OrderStatus.CREATED)
+        order = Order(total_price=self.total_price, menu_items=items,
+                      status=OrderStatus.CREATED)
         with Session(engine) as session:
             session.add(order)
             session.commit()
