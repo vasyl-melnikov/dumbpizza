@@ -179,6 +179,8 @@ class AdminPage:
                 MDLabel(text=item.name, halign='center', font_style='H6'))
             card.add_widget(MDLabel(text=f"${item.price}", halign='center'))
             card.add_widget(MDLabel(text=item.description, halign='left'))
+            if not os.path.exists('assets'):
+                os.mkdir('assets')
             with open(os.path.join(f'assets', f'menu_item{item.id}.jpg'), 'wb') as f:
                 f.write(base64.b64decode(item.image))
             card.add_widget(AsyncImage(source=os.path.join(f'assets', f'menu_item{item.id}.jpg'),
