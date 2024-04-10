@@ -39,6 +39,13 @@ engine = create_engine(DATABASE_URL, echo=True)
 user_manager = UserManager(engine)
 admin_manager = AdminManager(engine)
 
+status_colors = {
+        OrderStatus.CREATED: "[color=008080]",  # Green color
+        OrderStatus.COOKING: "[color=FFD700]",  # Gold color
+        OrderStatus.READY: "[color=FFA500]",    # Orange color
+        OrderStatus.DONE: "[color=32CD32]",     # Lime Green color
+        OrderStatus.CANCELLED: "[color=FF0000]"  # Red color
+    }
 
 def gen_metadata():
     SQLModel.metadata.create_all(engine)
@@ -222,16 +229,21 @@ class AdminPage:
             card.md_bg_color = "#808080"
             card.add_widget(
                 MDLabel(text=item.name, halign='center', font_style='H6'))
-            card.add_widget(MDLabel(text=f"Price: ${item.price}", halign='center'))
-            card.add_widget(MDLabel(text=f"Weight: {item.weight}", halign='center'))
-            card.add_widget(MDLabel(text=f"Radius: {item.radius}", halign='center'))
+            card.add_widget(
+                MDLabel(text=f"Price: ${item.price}", halign='center'))
+            card.add_widget(
+                MDLabel(text=f"Weight: {item.weight}", halign='center'))
+            card.add_widget(
+                MDLabel(text=f"Radius: {item.radius}", halign='center'))
             card.add_widget(MDLabel(text=item.description, halign='left'))
             if not os.path.exists('assets'):
                 os.mkdir('assets')
-            with open(os.path.join(f'assets', f'menu_item{item.id}.jpg'), 'wb') as f:
+            with open(os.path.join(f'assets', f'menu_item{item.id}.jpg'),
+                      'wb') as f:
                 f.write(base64.b64decode(item.image))
-            card.add_widget(AsyncImage(source=os.path.join(f'assets', f'menu_item{item.id}.jpg'),
-                                       nocache=True))
+            card.add_widget(AsyncImage(
+                source=os.path.join(f'assets', f'menu_item{item.id}.jpg'),
+                nocache=True))
 
             # Add an "Edit" button to each menu item card
             edit_button = MDRaisedButton(text="Edit", size_hint=(None, None),
@@ -277,7 +289,8 @@ class AdminPage:
                                   spacing=dp(16))
 
         # Add text input fields for editing menu item properties
-        name_input = MDTextField(text=item.name, hint_text="Name", foreground_color=(0, 0, 0, .4))
+        name_input = MDTextField(text=item.name, hint_text="Name",
+                                 foreground_color=(0, 0, 0, .4))
         price_input = MDTextField(text=str(item.price), hint_text="Price")
         weight_input = MDTextField(text=str(item.weight), hint_text="Weight")
         radius_input = MDTextField(text=str(item.radius), hint_text="Radius")
@@ -456,7 +469,8 @@ def get_logged_in_user() -> dict[str, str] | None:
         with open(SESSION_FILE, 'r') as file:
             data = file.read().split(',')
             if len(data) == 4:
-                return {'id': data[0], 'first_name': data[1], 'last_name': data[2], 'phone_number': data[3]}
+                return {'id': data[0], 'first_name': data[1],
+                        'last_name': data[2], 'phone_number': data[3]}
     return None
 
 
@@ -479,10 +493,12 @@ class LoginPage:
                              spacing=dp(24))
         first_name_field = MDTextField(hint_text="First Name", required=True)
         last_name_field = MDTextField(hint_text="Last Name", required=True)
-        phone_number_field = MDTextField(hint_text="Phone Number", required=True)
+        phone_number_field = MDTextField(hint_text="Phone Number",
+                                         required=True)
 
         register_button = MDRaisedButton(text="Register",
-                                         on_release=lambda x: self.register_user(
+                                         on_release=lambda
+                                             x: self.register_user(
                                              first_name_field.text,
                                              last_name_field.text,
                                              phone_number_field.text))
@@ -508,13 +524,15 @@ class LoginPage:
             dialog.open()
             self.dialog = dialog
         else:
-            user = User(first_name=first_name, last_name=last_name, phone_number=str(phone_num))
+            user = User(first_name=first_name, last_name=last_name,
+                        phone_number=str(phone_num))
             user_manager.add_user(user)
 
             new_user = user_manager.get_user(phone_num)
 
             with open(SESSION_FILE, 'w') as file:
-                file.write(f"{new_user.id},{first_name},{last_name},{phone_num}")
+                file.write(
+                    f"{new_user.id},{first_name},{last_name},{phone_num}")
 
             self.login_as_guest(self)
 
@@ -524,7 +542,8 @@ class LoginPage:
         layout = MDBoxLayout(orientation='vertical', padding=dp(48),
                              spacing=dp(24))
         username_field = MDTextField(hint_text="Username", required=True)
-        password_field = MDTextField(hint_text="Password", required=True, password=True)
+        password_field = MDTextField(hint_text="Password", required=True,
+                                     password=True)
 
         login_button = MDRaisedButton(text="Login",
                                       on_release=lambda x: self.login_admin(
@@ -578,36 +597,54 @@ class GuestPage:
     def add_order(self, menu_items: list[int]):
         items = [user_manager.get_menu_item_by_id(m_id) for m_id in menu_items]
         order = Order(total_price=self.total_price, menu_items=items,
-                      status=OrderStatus.CREATED, user_id=get_logged_in_user()['id'])
+                      status=OrderStatus.CREATED,
+                      user_id=get_logged_in_user()['id'])
         with Session(engine) as session:
             session.add(order)
             session.commit()
 
     def show_guest_screen(self, *_):
         self.screen_manager.clear_widgets()
-
-        guest_screen = Screen(name='guest')
-        layout = MDBoxLayout(orientation='vertical', spacing=dp(10))
-        scroll_view = ScrollView()
-        menu_list = MDBoxLayout(orientation='vertical', adaptive_height=True,
-                                spacing=dp(10))
-
-        # Keep track of selected items and total price
+        menu_list = MDList(padding=dp(24), spacing=dp(16))
+        cards = []
         self.selected_items = []
         self.total_price = 0
 
         for item in user_manager.get_menu_items():
+            card = MDCard(size_hint_y=None, height=dp(200), padding=dp(16),
+                          spacing=dp(8))
+            card.md_bg_color = "#808080"
             checkbox = CheckBox(size_hint=(None, None), size=(dp(48), dp(48)))
-            checkbox.item_name = item.name
-            checkbox.id = item.id
-            checkbox.item_price = item.price
+            checkbox.item = item
             checkbox.bind(active=self.on_checkbox_active)
-            menu_list.add_widget(checkbox)
-            menu_list.add_widget(
-                OneLineListItem(text=f"{item.name} - ${item.price}"))
+            card.add_widget(checkbox)
+            card.add_widget(
+                MDLabel(text=item.name, halign='center', font_style='H6'))
+            card.add_widget(
+                MDLabel(text=f"Price: ${item.price}", halign='center'))
+            card.add_widget(
+                MDLabel(text=f"Weight: {item.weight}", halign='center'))
+            card.add_widget(
+                MDLabel(text=f"Radius: {item.radius}", halign='center'))
+            card.add_widget(MDLabel(text=item.description, halign='left'))
+            if not os.path.exists('assets'):
+                os.mkdir('assets')
+            with open(os.path.join(f'assets', f'menu_item{item.id}.jpg'),
+                      'wb') as f:
+                f.write(base64.b64decode(item.image))
+            card.add_widget(AsyncImage(
+                source=os.path.join(f'assets', f'menu_item{item.id}.jpg'),
+                nocache=True))
+            cards.append(card)
 
-        scroll_view.add_widget(menu_list)
-        layout.add_widget(scroll_view)
+        for card in cards:
+            menu_list.add_widget(card)
+
+        menu_scroll_view = ScrollView()
+        menu_scroll_view.add_widget(menu_list)
+
+        buttons_layout = MDBoxLayout(orientation='horizontal', padding=dp(12),
+                                     spacing=dp(12))
         order_button = MDRaisedButton(text="Place Order",
                                       pos_hint={'center_x': 0.5},
                                       on_release=self.place_order)
@@ -622,12 +659,95 @@ class GuestPage:
         logout_button = MDRaisedButton(text="Logout",
                                        pos_hint={'center_x': 0.5},
                                        on_release=self.logout)
-        layout.add_widget(order_button)
-        layout.add_widget(back_button)
-        layout.add_widget(edit_profile_button)
-        layout.add_widget(logout_button)
-        guest_screen.add_widget(layout)
+        o_history_button = MDRaisedButton(text="Orders history",
+                                          pos_hint={'center_x': 0.5},
+                                          on_release=self.show_order_history_screen)
+        buttons_layout.add_widget(order_button)
+        buttons_layout.add_widget(back_button)
+        buttons_layout.add_widget(edit_profile_button)
+        buttons_layout.add_widget(logout_button)
+        buttons_layout.add_widget(o_history_button)
+
+        guest_screen = Screen(name='guest')
+        guest_layout = MDBoxLayout(orientation='vertical')
+        guest_layout.add_widget(menu_scroll_view)
+        guest_screen.add_widget(guest_layout)
+        guest_screen.add_widget(buttons_layout)
+
         self.screen_manager.add_widget(guest_screen)
+
+    def show_order_history_screen(self, *_):
+        self.screen_manager.clear_widgets()
+        orders_screen = Screen(name='orders')
+
+        # Create a scrollable view for orders list
+        orders_scroll_view = MDScrollView()
+
+        # Create a grid layout for orders list
+        orders_grid = MDGridLayout(cols=1, padding=dp(12), spacing=dp(12),
+                                   size_hint_y=None)
+        orders_grid.bind(minimum_height=orders_grid.setter('height'))
+
+        for order in user_manager.get_orders_by_user_id(
+                int(get_logged_in_user()['id'])):
+            # Create a card for each order
+            card = MDCard(size_hint=(None, None), size=(dp(700), dp(250)),
+                          padding=dp(16), spacing=dp(8))
+
+            card.add_widget(
+                MDLabel(text=f"[color=008080]Order ID:[/color] {order.id}",
+                        font_size=sp(16), markup=True))
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Created at:[/color] {order.created_at.strftime('%m/%d/%Y, %H:%M:%S')}",
+                font_size=sp(16), markup=True))
+            card.add_widget(
+                MDLabel(text=f"[color=008080]Status:[/color] [b]{status_colors[order.status]}{order.status.title()}[/b][/color] ",
+                        font_size=sp(16), markup=True))
+            menu_items_text = "["
+            for menu_item in order.menu_items:
+                menu_items_text += f"{menu_item.name},\n"
+            menu_items_text += "]"
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Menu Items:[/color]\n{menu_items_text}",
+                font_size=sp(16), markup=True))
+
+            card.add_widget(MDLabel(
+                text=f"[color=008080]Total price of order:[/color] {order.total_price}",
+                font_size=sp(16), markup=True))
+
+            # Add card to the grid layout
+            orders_grid.add_widget(card)
+
+        buttons_layout = MDBoxLayout(orientation='horizontal',
+                                     padding=dp(12),
+                                     spacing=dp(12))
+        back_button = MDRaisedButton(text="Admin Login",
+                                     pos_hint={'center_x': 0.5},
+                                     on_release=self.admin_login_page_entrance)
+        o_button = MDRaisedButton(text="Orders history",
+                                  pos_hint={'center_x': 0.5},
+                                  on_release=self.show_guest_screen)
+
+        edit_profile_button = MDRaisedButton(text="Edit Profile",
+                                             pos_hint={'center_x': 0.5},
+                                             on_release=self.edit_credentials_page)
+
+        logout_button = MDRaisedButton(text="Logout",
+                                       pos_hint={'center_x': 0.5},
+                                       on_release=self.logout)
+        buttons_layout.add_widget(o_button)
+        buttons_layout.add_widget(back_button)
+        buttons_layout.add_widget(edit_profile_button)
+        buttons_layout.add_widget(logout_button)
+        # Add grid layout to the scrollable view
+        orders_scroll_view.add_widget(orders_grid)
+
+        # Add scrollable view and footer buttons to the screen
+        orders_screen.add_widget(orders_scroll_view)
+        orders_screen.add_widget(buttons_layout)
+
+        # Add the screen to the screen manager
+        self.screen_manager.add_widget(orders_screen)
 
     def logout(self, *_):
         if os.path.exists(SESSION_FILE):
@@ -638,7 +758,6 @@ class GuestPage:
             self.show_login_screen()
 
     def edit_credentials_page(self, *_):
-
         self.screen_manager.clear_widgets()
 
         user_credentials: dict[str, str] = get_logged_in_user()
@@ -646,12 +765,16 @@ class GuestPage:
 
         layout = MDBoxLayout(orientation='vertical', padding=dp(48),
                              spacing=dp(24))
-        first_name_field = MDTextField(text=user_credentials.get("first_name"), hint_text="First Name", required=True)
-        last_name_field = MDTextField(text=user_credentials.get("last_name"), hint_text="Last Name", required=True)
-        phone_num_field = MDTextField(text=user_credentials.get("phone_number"), hint_text="Phone Number", required=True)
+        first_name_field = MDTextField(text=user_credentials.get("first_name"),
+                                       hint_text="First Name", required=True)
+        last_name_field = MDTextField(text=user_credentials.get("last_name"),
+                                      hint_text="Last Name", required=True)
+        phone_num_field = MDTextField(text=user_credentials.get("phone_number"),
+                                      hint_text="Phone Number", required=True)
 
         save_changes_button = MDRaisedButton(text="Save",
-                                             on_release=lambda x: self.save_changes(
+                                             on_release=lambda
+                                                 x: self.save_changes(
                                                  first_name_field.text,
                                                  last_name_field.text,
                                                  phone_num_field.text))
@@ -680,7 +803,8 @@ class GuestPage:
             self.dialog = dialog
         else:
             old_phone_number = get_logged_in_user().get("phone_number")
-            user = User(first_name=first_name, last_name=last_name, phone_number=phone_num)
+            user = User(first_name=first_name, last_name=last_name,
+                        phone_number=phone_num)
             new_user = user_manager.update_user(old_phone_number, user)
 
             if not new_user:
@@ -694,18 +818,19 @@ class GuestPage:
                 self.dialog = dialog
             else:
                 with open(SESSION_FILE, 'w') as file:
-                    file.write(f"{new_user.id},{first_name},{last_name},{phone_num}")
+                    file.write(
+                        f"{new_user.id},{first_name},{last_name},{phone_num}")
 
             self.screen_manager.clear_widgets()
             self.edit_credentials_page()
 
     def on_checkbox_active(self, checkbox, value):
         if value:
-            self.selected_items.append(checkbox.id)
-            self.total_price += checkbox.item_price
+            self.selected_items.append(checkbox.item.id)
+            self.total_price += checkbox.item.price
         else:
-            self.selected_items.remove(checkbox.id)
-            self.total_price -= checkbox.item_price
+            self.selected_items.remove(checkbox.item.id)
+            self.total_price -= checkbox.item.price
 
     def place_order(self, instance):
         if not self.selected_items:

@@ -1,4 +1,5 @@
 import hashlib
+from typing import Sequence
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -22,7 +23,9 @@ class AdminManager:
 
     def get_all_orders(self) -> list[Order]:
         with Session(self.__db) as session:
-            return session.exec(select(Order).options(selectinload(Order.menu_items), selectinload(Order.user))).all()
+            return session.exec(
+                select(Order).options(selectinload(Order.menu_items),
+                                      selectinload(Order.user))).all()
 
     def get_order_by_id(self, order_id: int) -> Order:
         with Session(self.__db) as session:
@@ -41,7 +44,8 @@ class AdminManager:
             session.commit()
             session.refresh(order)
 
-    def update_order_status(self, order_id: int, new_status: OrderStatus) -> None:
+    def update_order_status(self, order_id: int,
+                            new_status: OrderStatus) -> None:
         with Session(self.__db) as session:
             statement = select(Order).where(Order.id == order_id)
             order = session.exec(statement).one()
@@ -90,7 +94,8 @@ class UserManager:
 
     def update_user(self, old_phone_number: str, user: User) -> User | None:
         with Session(self.__db) as session:
-            statement = select(User).where(User.phone_number == old_phone_number)
+            statement = select(User).where(
+                User.phone_number == old_phone_number)
             old_user = session.exec(statement).one()
             if old_user:
                 old_user.first_name = user.first_name
@@ -105,8 +110,15 @@ class UserManager:
 
     def get_user(self, number: int) -> User:
         with Session(self.__db) as session:
-            statement = select(User).where(User.phone_number == number)
-            return session.exec(statement).one()
+            return session.exec(select(User)
+                                .where(User.phone_number == number)
+                                .options(selectinload(User.orders))).one()
+
+    def get_user_by_id(self, id: int) -> User:
+        with Session(self.__db) as session:
+            return session.exec(select(User)
+                                .where(User.id == id)
+                                .options(selectinload(User.orders))).one()
 
     def get_menu_items(self) -> list[MenuItem]:
         with Session(self.__db) as session:
@@ -119,10 +131,11 @@ class UserManager:
 
     def get_order_by_id(self, order_id: int) -> Order:
         with Session(self.__db) as session:
-            statement = select(Order).where(Order.id == order_id)
-            return session.exec(statement).one()
+            return session.exec(
+                select(Order).where(Order.id == order_id).options(selectinload(Order.menu_items))).one()
 
-    def get_orders_by_user_id(self, user_id: int) -> list[Order]:
+    def get_orders_by_user_id(self, user_id: int) -> Sequence[Order]:
         with Session(self.__db) as session:
-            statement = select(User).where(User.id == user_id)
-            return session.exec(statement).one().orders
+            return session.exec(
+                select(Order).where(User.id == user_id).order_by(Order.created_at.desc()).options(selectinload(Order.menu_items))).all()
+
