@@ -1,11 +1,12 @@
 import hashlib
 from typing import Sequence
 
-from sqlalchemy import func
+from sqlalchemy import func, desc
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
-from models import MenuItem, User, Order, OrderStatus, Admin
+from models import MenuItem, User, Order, OrderStatus, Admin, OrderMenuItems
 
 
 class AdminManager:
@@ -95,7 +96,6 @@ class AdminManager:
             return session.exec(statement).one() or 0.0
 
 
-
 class UserManager:
     def __init__(self, db):
         self.__db = db
@@ -159,5 +159,34 @@ class UserManager:
     def get_orders_by_user_id(self, user_id: int) -> Sequence[Order]:
         with Session(self.__db) as session:
             return session.exec(
-                select(Order).where(User.id == user_id).order_by(Order.created_at.desc()).options(selectinload(Order.menu_items))).all()
+                select(Order).where(User.id == user_id).order_by(Order.created_at.desc()).options(
+                    selectinload(Order.menu_items))).all()
 
+    def get_total_number_of_orders_by_user_id(self, user_id: int) -> int:
+        with Session(self.__db) as session:
+            statement = select(func.count(Order.id)).where(Order.user_id == user_id)
+            return session.exec(statement).one() or 0
+
+    def get_total_amount_spent_by_user_id(self, user_id: int) -> float:
+        with Session(self.__db) as session:
+            statement = select(func.sum(Order.total_price)).where(Order.user_id == user_id)
+            return session.exec(statement).one() or 0.0
+
+    def get_avg_amount_spent_by_user_id(self, user_id: int) -> float:
+        with Session(self.__db) as session:
+            statement = select(func.avg(Order.total_price)).where(Order.user_id == user_id)
+            return session.exec(statement).one() or 0.0
+
+    def get_most_ordered_item_by_user_id(self, user_id: int) -> str:
+        with Session(self.__db) as session:
+            statement = (select(MenuItem.name)
+                         .join(OrderMenuItems, MenuItem.id == OrderMenuItems.menu_item_id)
+                         .join(Order, Order.id == OrderMenuItems.order_id)
+                         .filter(Order.user_id == user_id)
+                         .group_by(MenuItem.name)
+                         .order_by(desc(func.count(OrderMenuItems.menu_item_id)))
+                         .limit(1))
+            try:
+                return session.exec(statement).one()
+            except NoResultFound:
+                return "None"

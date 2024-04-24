@@ -707,11 +707,15 @@ class GuestPage:
         o_history_button = MDRaisedButton(text="Orders history",
                                           pos_hint={'center_x': 0.5},
                                           on_release=self.show_order_history_screen)
+        stats_button = MDRaisedButton(text="Stats",
+                                      pos_hint={'center_x': 0.5},
+                                      on_release=self.show_user_stats_screen)
         buttons_layout.add_widget(order_button)
         buttons_layout.add_widget(back_button)
         buttons_layout.add_widget(edit_profile_button)
         buttons_layout.add_widget(logout_button)
         buttons_layout.add_widget(o_history_button)
+        buttons_layout.add_widget(stats_button)
 
         guest_screen = Screen(name='guest')
         guest_layout = MDBoxLayout(orientation='vertical')
@@ -720,6 +724,44 @@ class GuestPage:
         guest_screen.add_widget(buttons_layout)
 
         self.screen_manager.add_widget(guest_screen)
+
+    def show_user_stats_screen(self, *_):
+        self.screen_manager.clear_widgets()
+
+        stats_screen = Screen(name='stats')
+
+        card = MDCard(size_hint_y=None, height=dp(300), padding=dp(16),
+                      spacing=dp(8), pos_hint={"top": 1})
+        card.md_bg_color = "#808080"
+
+        user_id = int(get_logged_in_user()['id'])
+
+        card.add_widget(
+            MDLabel(text=f"Total number of orders: {user_manager.get_total_number_of_orders_by_user_id(user_id)}", halign='center',
+                    font_style='H6'))
+        card.add_widget(
+            MDLabel(text=f"Total money spent: ${user_manager.get_total_amount_spent_by_user_id(user_id)}", halign='center'))
+        card.add_widget(
+            MDLabel(text=f"Average money spent: ${user_manager.get_avg_amount_spent_by_user_id(user_id)}", halign='center'))
+        card.add_widget(
+            MDLabel(text=f"Most ordered item: {user_manager.get_most_ordered_item_by_user_id(user_id)}", halign='center'))
+
+        back_button = MDRectangleFlatButton(text="Back",
+                                            size_hint=(None, None),
+                                            size=(dp(150), dp(50)),
+                                            on_release=self.show_guest_screen)
+
+        # Create grid layout for footer buttons
+        buttons_layout = MDBoxLayout(orientation='horizontal', padding=dp(12),
+                                     spacing=dp(12))
+
+        buttons_layout.add_widget(back_button)
+
+        stats_screen.add_widget(card)
+        stats_screen.add_widget(buttons_layout)
+
+        self.screen_manager.add_widget(stats_screen)
+
 
     def show_order_history_screen(self, *_):
         self.screen_manager.clear_widgets()
@@ -770,7 +812,7 @@ class GuestPage:
         back_button = MDRaisedButton(text="Admin Login",
                                      pos_hint={'center_x': 0.5},
                                      on_release=self.admin_login_page_entrance)
-        o_button = MDRaisedButton(text="Orders history",
+        o_button = MDRaisedButton(text="Back",
                                   pos_hint={'center_x': 0.5},
                                   on_release=self.show_guest_screen)
 
