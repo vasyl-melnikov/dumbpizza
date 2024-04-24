@@ -257,7 +257,13 @@ class AdminPage:
                                          size=(100, 50))
             edit_button.bind(
                 on_release=lambda button, item=item: self.show_edit_popup(item))
+
+            delete_button = MDRaisedButton(text="Delete", size_hint=(None, None),
+                                         size=(100, 50))
+            delete_button.bind(
+                on_release=lambda button, item=item: self.show_delete_popup(item))
             card.add_widget(edit_button)
+            card.add_widget(delete_button)
             cards.append(card)
 
         for card in cards:
@@ -288,6 +294,23 @@ class AdminPage:
         admin_screen.add_widget(buttons_layout)
 
         self.screen_manager.add_widget(admin_screen)
+
+    def show_delete_popup(self, item):
+        popup_content = BoxLayout(orientation='vertical', padding=dp(24), spacing=dp(16))
+
+        delete_button = MDRaisedButton(text="DELETE", size_hint=(None, None), size=(150, 50))
+        delete_button.bind(on_release=lambda button: admin_manager.delete_menu_item(item))
+        popup_content.add_widget(delete_button)
+
+        popup = Popup(title="Are you sure you want to delete this item?", content=popup_content,
+                      size_hint=(None, None), size=(400, 400),
+                      separator_color=[0, 0, 0, 1],
+                      title_color=[0, 0, 0, 1],
+                      title_align='center',
+                      background_color=[255, 255, 255, 255])
+
+        popup.open()
+        self.dialog = popup
 
     def show_edit_popup(self, item):
         # Create a popup window for editing menu item properties
@@ -333,10 +356,11 @@ class AdminPage:
 
         # Create and open the popup
         popup = Popup(title="Edit Menu Item", content=popup_content,
-                      size_hint=(None, None), size=(800, 1200),
+                      size_hint=(None, None), size=(400, 400),
                       separator_color=[0, 0, 0, 1],
-                      background_color=[255, 255, 255, 255],
-                      )
+                      title_color=[0, 0, 0, 1],
+                      title_align='center',
+                      background_color=[255, 255, 255, 255])
         popup.open()
         self.dialog = popup
 
@@ -437,10 +461,11 @@ class AdminPage:
 
         # Create and open the popup
         popup = Popup(title="Add new menu item", content=popup_content,
-                      size_hint=(None, None), size=(800, 1300),
-                      # separator_color=[0, 0, 0, 1],
-                      # background_color=[255, 255, 255, 255],
-                      )
+                      size_hint=(None, None), size=(400, 400),
+                      separator_color=[0, 0, 0, 1],
+                      title_color=[0, 0, 0, 1],
+                      title_align='center',
+                      background_color=[255, 255, 255, 255])
         popup.open()
         self.dialog = popup
 

@@ -40,6 +40,12 @@ class AdminManager:
             session.commit()
             # session.refresh(menu_item)
 
+    def delete_menu_item(self, menu_item: MenuItem) -> None:
+        with Session(self.__db) as session:
+            session.delete(menu_item)
+            session.commit()
+            # session.refresh(menu_item)
+
     def insert_order(self, order: Order) -> None:
         with Session(self.__db) as session:
             session.add(order)
