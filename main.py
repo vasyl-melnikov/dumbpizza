@@ -259,7 +259,7 @@ class AdminPage:
                 on_release=lambda button, item=item: self.show_edit_popup(item))
 
             delete_button = MDRaisedButton(text="Delete", size_hint=(None, None),
-                                         size=(100, 50))
+                                           size=(100, 50))
             delete_button.bind(
                 on_release=lambda button, item=item: self.show_delete_popup(item))
             card.add_widget(edit_button)
@@ -662,6 +662,7 @@ class GuestPage:
         self.admin_login_page_entrance = admin_login_page_entrance
         self.dialog = None
         self.selected_items = []
+        self.selected_items_name = []
         self.total_price = 0
 
     def add_order(self, menu_items: list[int]):
@@ -762,14 +763,18 @@ class GuestPage:
         user_id = int(get_logged_in_user()['id'])
 
         card.add_widget(
-            MDLabel(text=f"Total number of orders: {user_manager.get_total_number_of_orders_by_user_id(user_id)}", halign='center',
+            MDLabel(text=f"Total number of orders: {user_manager.get_total_number_of_orders_by_user_id(user_id)}",
+                    halign='center',
                     font_style='H6'))
         card.add_widget(
-            MDLabel(text=f"Total money spent: ${user_manager.get_total_amount_spent_by_user_id(user_id)}", halign='center'))
+            MDLabel(text=f"Total money spent: ${user_manager.get_total_amount_spent_by_user_id(user_id)}",
+                    halign='center'))
         card.add_widget(
-            MDLabel(text=f"Average money spent: ${user_manager.get_avg_amount_spent_by_user_id(user_id)}", halign='center'))
+            MDLabel(text=f"Average money spent: ${user_manager.get_avg_amount_spent_by_user_id(user_id)}",
+                    halign='center'))
         card.add_widget(
-            MDLabel(text=f"Most ordered item: {user_manager.get_most_ordered_item_by_user_id(user_id)}", halign='center'))
+            MDLabel(text=f"Most ordered item: {user_manager.get_most_ordered_item_by_user_id(user_id)}",
+                    halign='center'))
 
         back_button = MDRectangleFlatButton(text="Back",
                                             size_hint=(None, None),
@@ -786,7 +791,6 @@ class GuestPage:
         stats_screen.add_widget(buttons_layout)
 
         self.screen_manager.add_widget(stats_screen)
-
 
     def show_order_history_screen(self, *_):
         self.screen_manager.clear_widgets()
@@ -940,9 +944,11 @@ class GuestPage:
     def on_checkbox_active(self, checkbox, value):
         if value:
             self.selected_items.append(checkbox.item.id)
+            self.selected_items_name.append(checkbox.item.name)
             self.total_price += checkbox.item.price
         else:
             self.selected_items.remove(checkbox.item.id)
+            self.selected_items_name.append(checkbox.item.name)
             self.total_price -= checkbox.item.price
 
     def place_order(self, instance):
@@ -958,15 +964,22 @@ class GuestPage:
             return
 
         # Store the order and display confirmation dialog
-        self.add_order(self.selected_items)
         dialog = MDDialog(title="Order Confirmation",
-                          text="Your order has been placed!",
+                          text=f"Are you sure you want to place order? "
+                               f"Selected items: {self.selected_items_name}, "
+                               f"Total price: {self.total_price}",
                           size_hint=(0.7, 0.3),
                           auto_dismiss=False,
-                          buttons=[MDFlatButton(text="OK",
+                          buttons=[MDFlatButton(text="Place order",
+                                                on_release=self.add_order_and_dismiss),
+                                   MDFlatButton(text="Cancel",
                                                 on_release=self.dismiss_dialog)])
         dialog.open()
         self.dialog = dialog
+
+    def add_order_and_dismiss(self, *_):
+        self.add_order(self.selected_items)
+        self.dismiss_dialog(self)
 
     def back_to_login(self, instance):
         self.screen_manager.clear_widgets()
