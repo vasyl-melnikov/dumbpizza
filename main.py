@@ -40,12 +40,13 @@ user_manager = UserManager(engine)
 admin_manager = AdminManager(engine)
 
 status_colors = {
-        OrderStatus.CREATED: "[color=008080]",  # Green color
-        OrderStatus.COOKING: "[color=FFD700]",  # Gold color
-        OrderStatus.READY: "[color=FFA500]",    # Orange color
-        OrderStatus.DONE: "[color=32CD32]",     # Lime Green color
-        OrderStatus.CANCELLED: "[color=FF0000]"  # Red color
-    }
+    OrderStatus.CREATED: "[color=008080]",  # Green color
+    OrderStatus.COOKING: "[color=FFD700]",  # Gold color
+    OrderStatus.READY: "[color=FFA500]",  # Orange color
+    OrderStatus.DONE: "[color=32CD32]",  # Lime Green color
+    OrderStatus.CANCELLED: "[color=FF0000]"  # Red color
+}
+
 
 def gen_metadata():
     SQLModel.metadata.create_all(engine)
@@ -171,10 +172,16 @@ class AdminPage:
                                             size=(dp(150), dp(50)),
                                             on_release=self.back_to_menu)
 
+        stats_menu = MDRectangleFlatButton(text="Stats",
+                                           size_hint=(None, None),
+                                           size=(dp(150), dp(50)),
+                                           on_release=self.back_to_stats)
+
         # Create grid layout for footer buttons
-        buttons_layout = MDGridLayout(cols=3, padding=dp(12),
-                                      spacing=dp(12))
+        buttons_layout = MDBoxLayout(orientation='horizontal', padding=dp(12),
+                                     spacing=dp(12))
         buttons_layout.add_widget(orders_menu)
+        buttons_layout.add_widget(stats_menu)
         buttons_layout.add_widget(add_item_button)
         buttons_layout.add_widget(back_button)
 
@@ -267,7 +274,7 @@ class AdminPage:
         back_button = MDRaisedButton(text="Back to Login", size_hint_x=None,
                                      width=dp(120),
                                      on_release=self.back_to_login)
-        orders_button = MDRaisedButton(text="Orders", size_hint_x=None,
+        orders_button = MDRaisedButton(text="Back", size_hint_x=None,
                                        width=dp(120),
                                        on_release=self.back_to_orders)
         buttons_layout.add_widget(orders_button)
@@ -451,6 +458,40 @@ class AdminPage:
         self.dismiss_dialog()
         self.back_to_menu()
 
+    def show_admin_stats_screen(self, *_):
+
+        stats_screen = Screen(name='stats')
+
+        card = MDCard(size_hint_y=None, height=dp(300), padding=dp(16),
+                      spacing=dp(8), pos_hint={"top": 1})
+        card.md_bg_color = "#808080"
+
+        card.add_widget(
+            MDLabel(text=f"Total number of orders: ${admin_manager.get_total_number_of_orders()}", halign='center',
+                    font_style='H6'))
+        card.add_widget(
+            MDLabel(text=f"Total revenue: ${admin_manager.get_total_revenue()}", halign='center'))
+        card.add_widget(
+            MDLabel(text=f"Average order price: ${admin_manager.get_avg_order_price()}", halign='center'))
+        card.add_widget(
+            MDLabel(text=f"Average order size: ${admin_manager.get_avg_order_size()}", halign='center'))
+
+        back_button = MDRectangleFlatButton(text="Back",
+                                            size_hint=(None, None),
+                                            size=(dp(150), dp(50)),
+                                            on_release=self.back_to_orders)
+
+        # Create grid layout for footer buttons
+        buttons_layout = MDBoxLayout(orientation='horizontal', padding=dp(12),
+                                     spacing=dp(12))
+
+        buttons_layout.add_widget(back_button)
+
+        stats_screen.add_widget(card)
+        stats_screen.add_widget(buttons_layout)
+
+        self.screen_manager.add_widget(stats_screen)
+
     def back_to_login(self, *_):
         self.screen_manager.clear_widgets()
         self.login_page_entrance()
@@ -462,6 +503,10 @@ class AdminPage:
     def back_to_orders(self, *_):
         self.screen_manager.clear_widgets()
         self.show_admin_order_screen()
+
+    def back_to_stats(self, *_):
+        self.screen_manager.clear_widgets()
+        self.show_admin_stats_screen()
 
 
 def get_logged_in_user() -> dict[str, str] | None:
@@ -701,8 +746,9 @@ class GuestPage:
                 text=f"[color=008080]Created at:[/color] {order.created_at.strftime('%m/%d/%Y, %H:%M:%S')}",
                 font_size=sp(16), markup=True))
             card.add_widget(
-                MDLabel(text=f"[color=008080]Status:[/color] [b]{status_colors[order.status]}{order.status.title()}[/b][/color] ",
-                        font_size=sp(16), markup=True))
+                MDLabel(
+                    text=f"[color=008080]Status:[/color] [b]{status_colors[order.status]}{order.status.title()}[/b][/color] ",
+                    font_size=sp(16), markup=True))
             menu_items_text = "["
             for menu_item in order.menu_items:
                 menu_items_text += f"{menu_item.name},\n"
@@ -867,7 +913,7 @@ class GuestPage:
 class PizzeriaApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.admin_username = "admin"
+        self.admin_username = "123"
         self.admin_password = "123"
         self.title = "Pizzeria App"
         self.theme_cls.theme_style = "Light"

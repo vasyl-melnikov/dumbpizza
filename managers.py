@@ -1,6 +1,7 @@
 import hashlib
 from typing import Sequence
 
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -72,6 +73,27 @@ class AdminManager:
             if admin.password != hashlib.sha256(password.encode()).hexdigest():
                 return False
             return True
+
+    def get_total_number_of_orders(self) -> int:
+        with Session(self.__db) as session:
+            statement = select(func.count()).select_from(Order)
+            return session.exec(statement).one()
+
+    def get_total_revenue(self) -> float:
+        with Session(self.__db) as session:
+            statement = select(func.sum(Order.total_price)).select_from(Order)
+            return session.exec(statement).one() or 0.0
+
+    def get_avg_order_price(self) -> float:
+        with Session(self.__db) as session:
+            statement = select(func.avg(Order.total_price)).select_from(Order)
+            return session.exec(statement).one() or 0.0
+
+    def get_avg_order_size(self) -> float:
+        with Session(self.__db) as session:
+            statement = select(func.avg(Order.total_price)).select_from(Order)
+            return session.exec(statement).one() or 0.0
+
 
 
 class UserManager:
