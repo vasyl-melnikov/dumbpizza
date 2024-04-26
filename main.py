@@ -1,19 +1,20 @@
 import os.path
 
 from kivy.metrics import dp, sp
-from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
 from kivy.uix.filechooser import FileChooserIconView
-from kivy.uix.gridlayout import GridLayout
 from kivy.uix.image import AsyncImage, Image
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton, MDFlatButton, MDIconButton, \
+from kivymd.uix.button import (
+    MDRaisedButton,
+    MDFlatButton,
     MDRectangleFlatButton
+)
 from kivymd.uix.card import MDCard
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.gridlayout import MDGridLayout
@@ -22,10 +23,10 @@ from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.scrollview import MDScrollView
 from kivymd.uix.textfield import MDTextField
 from kivy.uix.scrollview import ScrollView
-from kivymd.uix.list import OneLineListItem, MDList
+from kivymd.uix.list import MDList
 from sqlmodel import SQLModel, create_engine, Session
 import base64
-from models import OrderStatus, User, MenuItem, Order
+from models import OrderStatus, User, MenuItem, Order, Admin
 from managers import AdminManager, UserManager
 
 # SQLite database URL
@@ -91,6 +92,8 @@ def gen_metadata():
                         radius=item['radius'])
         admin_manager.insert_menu_item(menu)
 
+    admin_manager.insert_admin(Admin(name='admin', password='admin'))
+
 
 class AdminPage:
     def __init__(self, screen_manager, login_page_entrance):
@@ -132,10 +135,7 @@ class AdminPage:
             card.add_widget(MDLabel(
                 text=f"[color=008080]Guest phone number:[/color] {order.user.phone_number}",
                 font_size=sp(16), markup=True))
-            menu_items_text = "["
-            for menu_item in order.menu_items:
-                menu_items_text += f"{menu_item.name},\n"
-            menu_items_text += "]"
+            menu_items_text = str([menu_item.name for menu_item in order.menu_items])
             card.add_widget(MDLabel(
                 text=f"[color=008080]Menu Items:[/color]\n{menu_items_text}",
                 font_size=sp(16), markup=True))
@@ -158,16 +158,11 @@ class AdminPage:
         # Add grid layout to the scrollable view
         orders_scroll_view.add_widget(orders_grid)
 
-        # Create footer buttons
-        add_item_button = MDRectangleFlatButton(text="Add Item",
-                                                size_hint=(None, None),
-                                                size=(dp(150), dp(50)),
-                                                on_release=self.add_menu_item)
         back_button = MDRectangleFlatButton(text="Back to Login",
                                             size_hint=(None, None),
                                             size=(dp(150), dp(50)),
                                             on_release=self.back_to_login)
-        orders_menu = MDRectangleFlatButton(text="Menu",
+        orders_menu = MDRectangleFlatButton(text="Edit menu",
                                             size_hint=(None, None),
                                             size=(dp(150), dp(50)),
                                             on_release=self.back_to_menu)
@@ -182,7 +177,6 @@ class AdminPage:
                                      spacing=dp(12))
         buttons_layout.add_widget(orders_menu)
         buttons_layout.add_widget(stats_menu)
-        buttons_layout.add_widget(add_item_button)
         buttons_layout.add_widget(back_button)
 
         # Add scrollable view and footer buttons to the screen
@@ -233,7 +227,7 @@ class AdminPage:
         for item in user_manager.get_menu_items():
             card = MDCard(size_hint_y=None, height=dp(200), padding=dp(16),
                           spacing=dp(8))
-            card.md_bg_color = "#808080"
+            card.md_bg_color = "#E0E0E0"
             card.add_widget(
                 MDLabel(text=item.name, halign='center', font_style='H6'))
             card.add_widget(
@@ -258,10 +252,12 @@ class AdminPage:
             edit_button.bind(
                 on_release=lambda button, item=item: self.show_edit_popup(item))
 
-            delete_button = MDRaisedButton(text="Delete", size_hint=(None, None),
+            delete_button = MDRaisedButton(text="Delete",
+                                           size_hint=(None, None),
                                            size=(100, 50))
             delete_button.bind(
-                on_release=lambda button, item=item: self.show_delete_popup(item))
+                on_release=lambda button, item=item: self.show_delete_popup(
+                    item))
             card.add_widget(edit_button)
             card.add_widget(delete_button)
             cards.append(card)
@@ -280,12 +276,17 @@ class AdminPage:
         back_button = MDRaisedButton(text="Back to Login", size_hint_x=None,
                                      width=dp(120),
                                      on_release=self.back_to_login)
-        orders_button = MDRaisedButton(text="Back", size_hint_x=None,
+        orders_button = MDRaisedButton(text="Orders", size_hint_x=None,
                                        width=dp(120),
                                        on_release=self.back_to_orders)
+        stats_menu = MDRaisedButton(text="Stats",
+                                    size_hint=(None, None),
+                                    size=(dp(150), dp(50)),
+                                    on_release=self.back_to_stats)
         buttons_layout.add_widget(orders_button)
         buttons_layout.add_widget(add_item_button)
         buttons_layout.add_widget(back_button)
+        buttons_layout.add_widget(stats_menu)
 
         admin_screen = Screen(name='admin')
         admin_layout = MDBoxLayout(orientation='vertical')
@@ -296,14 +297,23 @@ class AdminPage:
         self.screen_manager.add_widget(admin_screen)
 
     def show_delete_popup(self, item):
-        popup_content = BoxLayout(orientation='vertical', padding=dp(24), spacing=dp(16))
+        popup_content = BoxLayout(orientation='vertical', padding=dp(24),
+                                  spacing=dp(16))
 
-        delete_button = MDRaisedButton(text="DELETE", size_hint=(None, None), size=(150, 50))
-        delete_button.bind(on_release=lambda button: admin_manager.delete_menu_item(item))
+        delete_button = MDRaisedButton(text="Delete", size_hint=(None, None),
+                                       size=(150, 50))
+        cancel_button = MDRaisedButton(text="Cancel", size_hint=(None, None),
+                                       size=(150, 50))
+        delete_button.bind(
+            on_release=lambda button: self.delete_menu_item(item))
+        cancel_button.bind(
+            on_release=self.dismiss_dialog)
         popup_content.add_widget(delete_button)
+        popup_content.add_widget(cancel_button)
 
-        popup = Popup(title="Are you sure you want to delete this item?", content=popup_content,
-                      size_hint=(None, None), size=(400, 400),
+        popup = Popup(title="Are you sure you want to delete this item?",
+                      content=popup_content,
+                      size_hint=(None, None), size=(600, 500),
                       separator_color=[0, 0, 0, 1],
                       title_color=[0, 0, 0, 1],
                       title_align='center',
@@ -312,10 +322,15 @@ class AdminPage:
         popup.open()
         self.dialog = popup
 
+    def delete_menu_item(self, item):
+        admin_manager.delete_menu_item(item)
+        self.dismiss_dialog()
+        self.back_to_menu()
+
     def show_edit_popup(self, item):
         # Create a popup window for editing menu item properties
         self.cur_menu_item_edit = item
-        popup_content = BoxLayout(orientation='vertical', padding=dp(24),
+        popup_content = BoxLayout(orientation='vertical', padding=dp(15),
                                   spacing=dp(16))
 
         # Add text input fields for editing menu item properties
@@ -356,7 +371,7 @@ class AdminPage:
 
         # Create and open the popup
         popup = Popup(title="Edit Menu Item", content=popup_content,
-                      size_hint=(None, None), size=(400, 400),
+                      size_hint=(None, None), size=(800, 1150),
                       separator_color=[0, 0, 0, 1],
                       title_color=[0, 0, 0, 1],
                       title_align='center',
@@ -461,7 +476,7 @@ class AdminPage:
 
         # Create and open the popup
         popup = Popup(title="Add new menu item", content=popup_content,
-                      size_hint=(None, None), size=(400, 400),
+                      size_hint=(None, None), size=(1000, 1150),
                       separator_color=[0, 0, 0, 1],
                       title_color=[0, 0, 0, 1],
                       title_align='center',
@@ -489,17 +504,24 @@ class AdminPage:
 
         card = MDCard(size_hint_y=None, height=dp(300), padding=dp(16),
                       spacing=dp(8), pos_hint={"top": 1})
-        card.md_bg_color = "#808080"
+        card.md_bg_color = "#E0E0E0"
 
         card.add_widget(
-            MDLabel(text=f"Total number of orders: ${admin_manager.get_total_number_of_orders()}", halign='center',
-                    font_style='H6'))
+            MDLabel(
+                text=f"Total number of orders: ${admin_manager.get_total_number_of_orders()}",
+                halign='center',
+                font_style='H6'))
         card.add_widget(
-            MDLabel(text=f"Total revenue: ${admin_manager.get_total_revenue()}", halign='center'))
+            MDLabel(text=f"Total revenue: ${admin_manager.get_total_revenue()}",
+                    halign='center'))
         card.add_widget(
-            MDLabel(text=f"Average order price: ${admin_manager.get_avg_order_price()}", halign='center'))
+            MDLabel(
+                text=f"Average order price: ${admin_manager.get_avg_order_price()}",
+                halign='center'))
         card.add_widget(
-            MDLabel(text=f"Average order size: ${admin_manager.get_avg_order_size()}", halign='center'))
+            MDLabel(
+                text=f"Average order size: ${admin_manager.get_avg_order_size()}",
+                halign='center'))
 
         back_button = MDRectangleFlatButton(text="Back",
                                             size_hint=(None, None),
@@ -631,7 +653,7 @@ class LoginPage:
         self.screen_manager.add_widget(login_screen)
 
     def login_admin(self, username, password):
-        if username == self.admin_username and password == self.admin_password:
+        if admin_manager.is_valid_credentials(username, password):
             self.screen_manager.clear_widgets()
             self.admin_page_entrance()
         else:
@@ -684,7 +706,7 @@ class GuestPage:
         for item in user_manager.get_menu_items():
             card = MDCard(size_hint_y=None, height=dp(200), padding=dp(16),
                           spacing=dp(8))
-            card.md_bg_color = "#808080"
+            card.md_bg_color = "#E0E0E0"
             checkbox = CheckBox(size_hint=(None, None), size=(dp(48), dp(48)))
             checkbox.item = item
             checkbox.bind(active=self.on_checkbox_active)
@@ -756,40 +778,54 @@ class GuestPage:
 
         stats_screen = Screen(name='stats')
 
-        card = MDCard(size_hint_y=None, height=dp(300), padding=dp(16),
-                      spacing=dp(8), pos_hint={"top": 1})
-        card.md_bg_color = "#808080"
+        card = MDCard(
+            size_hint_y=None,
+            height=dp(300),
+            padding=dp(16),
+            spacing=dp(8),
+            pos_hint={"top": 1},
+            elevation=dp(4),  # Add some elevation for depth
+            md_bg_color="#E0E0E0"
+            # Use theme color for better integration
+        )
 
         user_id = int(get_logged_in_user()['id'])
 
-        card.add_widget(
-            MDLabel(text=f"Total number of orders: {user_manager.get_total_number_of_orders_by_user_id(user_id)}",
-                    halign='center',
-                    font_style='H6'))
-        card.add_widget(
-            MDLabel(text=f"Total money spent: ${user_manager.get_total_amount_spent_by_user_id(user_id)}",
-                    halign='center'))
-        card.add_widget(
-            MDLabel(text=f"Average money spent: ${user_manager.get_avg_amount_spent_by_user_id(user_id)}",
-                    halign='center'))
-        card.add_widget(
-            MDLabel(text=f"Most ordered item: {user_manager.get_most_ordered_item_by_user_id(user_id)}",
-                    halign='center'))
+        stat_labels = [
+            MDLabel(
+                text=f"Total Orders: {user_manager.get_total_number_of_orders_by_user_id(user_id)}",
+                halign='center', font_style='H6'),
+            MDLabel(
+                text=f"Total Spent: ${user_manager.get_total_amount_spent_by_user_id(user_id):.2f}",
+                # Format currency with 2 decimal places
+                halign='center'),
+            MDLabel(
+                text=f"Avg. Spent: ${user_manager.get_avg_amount_spent_by_user_id(user_id):.2f}",
+                # Format currency with 2 decimal places
+                halign='center'),
+            MDLabel(
+                text=f"Most Ordered: {user_manager.get_most_ordered_item_by_user_id(user_id)}",
+                halign='center'),
+        ]
 
-        back_button = MDRectangleFlatButton(text="Back",
-                                            size_hint=(None, None),
-                                            size=(dp(150), dp(50)),
-                                            on_release=self.show_guest_screen)
+        for label in stat_labels:
+            card.add_widget(label)
 
-        # Create grid layout for footer buttons
-        buttons_layout = MDBoxLayout(orientation='horizontal', padding=dp(12),
+        back_button = MDRectangleFlatButton(
+            text="Back",
+            size_hint=(None, None),
+            size=(dp(150), dp(50)),
+            on_release=self.show_guest_screen  # Use built-in back navigation
+        )
+
+        buttons_layout = MDBoxLayout(orientation='horizontal',
+                                     padding=dp(12),
                                      spacing=dp(12))
 
         buttons_layout.add_widget(back_button)
 
         stats_screen.add_widget(card)
         stats_screen.add_widget(buttons_layout)
-
         self.screen_manager.add_widget(stats_screen)
 
     def show_order_history_screen(self, *_):
@@ -820,10 +856,7 @@ class GuestPage:
                 MDLabel(
                     text=f"[color=008080]Status:[/color] [b]{status_colors[order.status]}{order.status.title()}[/b][/color] ",
                     font_size=sp(16), markup=True))
-            menu_items_text = "["
-            for menu_item in order.menu_items:
-                menu_items_text += f"{menu_item.name},\n"
-            menu_items_text += "]"
+            menu_items_text = str([menu_item.name for menu_item in order.menu_items])
             card.add_widget(MDLabel(
                 text=f"[color=008080]Menu Items:[/color]\n{menu_items_text}",
                 font_size=sp(16), markup=True))

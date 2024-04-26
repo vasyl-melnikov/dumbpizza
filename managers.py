@@ -65,6 +65,7 @@ class AdminManager:
                 print("ORDERA NEMA TAKOGO")
 
     def insert_admin(self, admin: Admin):
+        admin.password = hashlib.sha256(admin.password.encode()).hexdigest()
         with Session(self.__db) as session:
             session.add(admin)
             session.commit()
@@ -73,9 +74,11 @@ class AdminManager:
     def is_valid_credentials(self, name: str, password: str) -> bool:
         with Session(self.__db) as session:
             statement = select(Admin).where(Admin.name == name)
-            admin = session.exec(statement).one()
+            try:
+                admin = session.exec(statement).one()
+            except Exception:
+                return False
             if not admin:
-                print("ADMINA NEMA TAKOGO")
                 return False
             if admin.password != hashlib.sha256(password.encode()).hexdigest():
                 return False
